@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Departures</title>
+<style>
+  @font-face {
+    font-family: 'Open Sans Bold';
+    src: url('https://raw.githubusercontent.com/MichaelH12345/simple-departure-board/main/Open%20Sans%20Bold.ttf') format('truetype');
+    font-weight: bold;
+    font-style: normal;
+  }
+
+    @font-face {
+    font-family: 'Open Sans';
+    src: url('https://raw.githubusercontent.com/MichaelH12345/simple-departure-board/main/Open%20Sans.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+  }
+
+    @font-face {
+    font-family: 'Open Sans Semibold';
+    src: url('https://raw.githubusercontent.com/MichaelH12345/simple-departure-board/main/Open%20Sans%20Semibold.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+  }
+
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: black;
+    color: white;
+    overflow: hidden;
+  }
+
+  header {
+    background-color: #001f4d;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    border-bottom: 4px solid white;
+    font-family: 'Open Sans', sans-serif;
+    position: relative;
+  }
+
+  .header-title {
+    font-family: 'Open Sans Bold', sans-serif;
+    font-weight: bold;
+    font-size: 4rem;
+    padding-left: 15px;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-row {
+    display: flex;
+    align-items: center;
+    padding-left: 15px;
+    font-size: 2.5rem;
+    margin: 0;
+    position: relative;
+  }
+
+  .time { margin-left: 0; }
+  .destination { flex: 1; margin-left: 75px; }
+  .status { position: absolute; right: 15px; }
+  .platform-header { position: absolute; right: 300px; }
+
+  .departure-row {
+    display: flex;
+    align-items: flex-start;
+    font-size: 3rem;
+    padding: 5px 15px;
+    border-bottom: 3px solid grey;
+    flex-wrap: wrap;
+    line-height: 1.3;
+    font-family: 'Open Sans', sans-serif;
+    position: relative;
+    transition: transform 1s ease-in, opacity 1s ease-in;
+  }
+
+  .destination-box { flex: 1; margin-left: 42.5px; }
+  .expected { position: absolute; right: 15px; }
+  .platform { position: absolute; right: 300px; }
+
+  @media (max-width: 600px) {
+    .header-title { font-size: 3rem; }
+    .header-row { font-size: 1.8rem; }
+    .departure-row { font-size: 2rem; }
+  }
+
+  @keyframes fade {
+    0%   { opacity: 0; }
+    50%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  .slide-out {
+    transform: translateX(100%);
+    transition: transform 0.75s ease-in;
+  }
+
+  /* Start off-screen left */
+  .slide-in-left {
+    transform: translateX(-100%);
+  }
+
+  /* Slide in from left to original position */
+  .slide-in-left-active {
+    transform: translateX(0);
+    transition: transform 0.8s ease-out;
+  }
+
+  /* New footer-page style (like footer-time but on left) */
+<style>
+#footer-page {
+  position: fixed;
+  left: 15px;               /* aligned left */
+  top: 0;                   /* inside the header/footer as needed */
+  font-family: 'Open Sans', sans-serif; /* same as footer-time */
+  font-weight: bold;
+  font-size: 3.25rem;
+  color: white;
+  white-space: nowrap;
+  padding: 15px 0;          /* optional vertical padding */
+}
+
+
+footer {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 100%;
+  height: 87.5px;
+  background-color: #001f4d;
+  border-top: 4px solid white;
+  display: flex;
+  align-items: center;      /* vertical centering */
+  justify-content: space-between; /* spread items */
+  padding: 0 15px;
+  box-sizing: border-box;
+}
+
+
+  #footer-time {
+    font-family: 'Open Sans', sans-serif;
+    font-weight: bold;
+    font-size: 3.5rem;
+    color: white;
+    white-space: nowrap;
+  }
+
+  /* "Time now:" text is smaller */
+  #footer-time .label {
+    font-family: 'Open Sans', sans-serif;
+    font-weight: normal;      
+    font-size: 70%; /* 75% of main time font size */
+  }
+
+  #footer-time .value {
+    margin-left: -5px;
+  }
+
+  #footer-message {
+  font-family: 'Open Sans', sans-serif;
+  font-weight: normal;           /* same weight as footer-time label */
+  font-size: 2.5rem;            /* same size as footer-time */
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 75%;                /* prevent overlap with time */
+}
+
+</style>
+</head>
+<body>
+  <header>
+    <div class="header-title" id="header-title"> stationName Departures</div>
+    <div class="header-row">
+      <div class="time">Time</div>
+      <div class="destination">Destination</div>
+      <div class="platform-header">Platform</div>
+      <div class="status">Expected</div>
+    </div>
+  </header>
+
+  <div id="departures-container"></div>
+<footer>
+  <div id="footer-message">Storm Floris may impact your journey today: check before you travel</div>
+  <div id="footer-page"></div>
+  <div id="footer-time">
+    <span class="label">Time now</span>
+    <span id="footer-time-value" class="value"></span>
+  </div>
+</footer>
+
+</body>
+</html>
+
+
+
+<script>
+
+
+const footerMessage = document.getElementById('footer-message');
+let incidents = [];
+let currentIncidentIndex = 0;
+
+const footerTimeValue = document.getElementById('footer-time-value');
+
+function updateFooterTime() {
+  const now = new Date();
+  const hours = now.getHours().toString().padStart(2,'0');
+  const minutes = now.getMinutes().toString().padStart(2,'0');
+  const seconds = now.getSeconds().toString().padStart(2,'0');
+  footerTimeValue.textContent = `${hours}:${minutes}:${seconds}`;
+}
+
+// Initial set
+updateFooterTime();
+
+// Update every second
+setInterval(updateFooterTime, 1000);
+
+
+const container = document.getElementById('departures-container');
+const headerTitle = document.getElementById('header-title');
+
+let services = [];
+let visibleServices = [];
+let lastVisibleData = {}; // store last known state of visible services
+
+// Fill a row with service data
+function fillRow(row, service) {
+  row.innerHTML = '';
+
+  const scheduled = document.createElement('div');
+  scheduled.classList.add('scheduled');
+  scheduled.textContent = service.std || '';
+  row.appendChild(scheduled);
+
+  const dest = document.createElement('div');
+  dest.classList.add('destination-box');
+  const destMain = document.createElement('div');
+  destMain.textContent = service.destination[0]?.locationName || '';
+  dest.appendChild(destMain);
+
+  if (service.destination[0]?.via) {
+    const viaLine = document.createElement('div');
+    viaLine.textContent = service.destination[0].via;
+    dest.appendChild(viaLine);
+  }
+
+  if (service.length && service.length !== 0) {
+    const lengthLine = document.createElement('div');
+    lengthLine.textContent = `This train has ${service.length} coaches.`;
+    dest.appendChild(lengthLine);
+  }
+
+  if (service.cancelReason || service.delayReason) {
+    const reasonLine = document.createElement('div');
+    if (service.cancelReason) {
+      reasonLine.textContent = service.cancelReason.replace(
+        'This service has been cancelled because of','Service cancelled due to'
+      ) + '.';
+    } else if (service.delayReason) {
+      reasonLine.textContent = service.delayReason.replace(
+        'This service has been delayed by','Service delayed due to'
+      ) + '.';
+    }
+    dest.appendChild(reasonLine);
+  }
+  row.appendChild(dest);
+
+  const expected = document.createElement('div');
+  expected.classList.add('expected');
+
+  if (service.etd === 'Cancelled') {
+    expected.textContent = 'Cancelled';
+    expected.style.animation = 'fade 2s infinite';
+    expected.style.fontWeight = 'bold';
+    expected.style.color = '#00bfff';
+  } else if (service.etd && service.etd !== 'On time') {
+    expected.textContent = (service.etd !== 'Delayed' ? '' : '') + service.etd;
+    expected.style.fontWeight = 'bold';
+    expected.style.color = '#00bfff';
+  } else {
+    expected.textContent = service.etd || '';
+  }
+  row.appendChild(expected);
+
+  const platform = document.createElement('div');
+  platform.classList.add('platform');
+  platform.textContent = service.platform || '-';
+  row.appendChild(platform);
+}
+
+// Animate a row update with slide-out → content update → slide-in from left
+function animateUpdate(row, newContentFn) {
+  row.style.transition = 'transform 0.5s ease-in';
+  row.style.transform = 'translateX(100%)';
+
+  setTimeout(() => {
+    row.style.transition = 'none';
+    row.style.transform = 'translateX(-100%)';
+    newContentFn(row);
+    void row.offsetWidth; // force reflow
+    row.style.transition = 'transform 0.5s ease-out';
+    row.style.transform = 'translateX(0)';
+
+    setTimeout(() => {
+      row.style.transition = '';
+    }, 800);
+  }, 750);
+}
+
+// Compare visible services with previous state
+function checkForChanges() {
+  visibleServices.forEach(service => {
+    const id = `${service.std}-${service.destination[0]?.locationName}`;
+    const fields = {
+      destination: service.destination[0]?.locationName || '',
+      platform: service.platform || '',
+      etd: service.etd || '',
+      std: service.std || '',
+      cancelReason: service.cancelReason || '',
+      delayReason: service.delayReason || ''
+    };
+
+    const row = document.querySelector(`.departure-row[data-id="${id}"]`);
+
+    if (!lastVisibleData[id]) {
+      lastVisibleData[id] = fields;
+    } else {
+      let hasChanged = false;
+      let onlyPlatformChanged = true;
+      for (let key in fields) {
+        if (fields[key] !== lastVisibleData[id][key]) {
+          if (key !== 'platform') onlyPlatformChanged = false;
+          hasChanged = true;
+        }
+      }
+
+      if (hasChanged && row) {
+        if (onlyPlatformChanged && fields.platform !== '-') {
+          const platformEl = row.querySelector('.platform');
+          if (platformEl) {
+            platformEl.style.transition = '';
+            platformEl.style.animation = 'fade 2s infinite';
+            platformEl.textContent = fields.platform;
+          }
+          lastVisibleData[id].platform = fields.platform;
+        } else {
+          animateUpdate(row, (r) => fillRow(r, service));
+          lastVisibleData[id] = fields;
+        }
+      }
+    }
+  });
+}
+
+// Render departures with 75px margin at bottom
+function renderRows() {
+  container.innerHTML = '';
+  const pageHeight = window.innerHeight;
+  visibleServices = [];
+
+  for (let service of services) {
+    const row = document.createElement('div');
+    row.classList.add('departure-row');
+    row.dataset.id = `${service.std}-${service.destination[0]?.locationName}`;
+    fillRow(row, service);
+
+    container.appendChild(row);
+
+    const rowBottom = row.getBoundingClientRect().bottom;
+    if (rowBottom > pageHeight - 75) {
+      container.removeChild(row);
+      break;
+    }
+
+    visibleServices.push(service);
+  }
+}
+
+function removeDisappearedService(disappearedId) {
+  const row = document.querySelector(`.departure-row[data-id="${disappearedId}"]`);
+  if (!row) return;
+
+  const shiftHeight = row.offsetHeight;
+
+  // Slide out the disappeared row (no fade, just slide right)
+  row.style.transition = 'transform 0.5s ease';
+  row.style.transform = 'translateX(100%)';
+
+  setTimeout(() => {
+    // Create placeholder with same height
+    const placeholder = document.createElement('div');
+    placeholder.style.height = shiftHeight + 'px';
+    placeholder.style.transition = 'height 0.5s ease';
+    placeholder.style.overflow = 'hidden';
+
+    // Insert placeholder where the row was
+    container.insertBefore(placeholder, row.nextSibling);
+
+    // Remove the actual row
+    container.removeChild(row);
+
+    // Animate placeholder shrinking
+    requestAnimationFrame(() => {
+      placeholder.style.height = '0px';
+    });
+
+    // Cleanup placeholder after animation
+    setTimeout(() => {
+      container.removeChild(placeholder);
+    }, 600);
+
+  }, 500); // wait for slide-out to finish
+}
+
+
+let currentStationCode = 'CAR'; // default station code
+
+// Make header clickable to change station
+headerTitle.style.cursor = 'pointer';
+headerTitle.addEventListener('click', () => {
+  const code = prompt('Enter a station code (e.g., GTW, EUS, LST):', currentStationCode);
+  if (code) {
+    currentStationCode = code.toUpperCase();
+
+    // Clear current departures
+    container.innerHTML = '';
+    services = [];
+    visibleServices = [];
+    lastVisibleData = {};
+
+    // Fetch and render departures for new station
+    fetchDepartures();
+  }
+});
+
+// Container for "no services" or error message
+let noServicesMessage = null;
+
+function fetchDepartures() {
+  fetch(`https://huxley2.azurewebsites.net/departures/${currentStationCode}`)
+    .then(res => res.json())
+    .then(data => {
+      const newServices = data.trainServices || [];
+      const locationName = data.locationName || currentStationCode;
+
+      // Clear previous message if exists
+      if (noServicesMessage) {
+        noServicesMessage.remove();
+        noServicesMessage = null;
+      }
+
+      if (newServices.length === 0) {
+        // Show "no services" message
+        noServicesMessage = document.createElement('div');
+        noServicesMessage.textContent = 'There are no services scheduled to depart from this station in the next 2 hours.';
+        noServicesMessage.style.position = 'absolute';
+        noServicesMessage.style.fontFamily = "Open Sans";
+        noServicesMessage.style.top = '175px';
+        noServicesMessage.style.left = '50%';
+        noServicesMessage.style.transform = 'translateX(-50%)';
+        noServicesMessage.style.fontSize = '3.5rem';
+        noServicesMessage.style.color = 'white';
+        noServicesMessage.style.textAlign = 'center';
+
+        document.body.appendChild(noServicesMessage);
+
+        // Stop further processing
+        container.innerHTML = '';
+        services = [];
+        visibleServices = [];
+        lastVisibleData = {};
+        headerTitle.textContent = `${locationName} Departures`;
+        return;
+      }
+
+      // Detect disappeared services
+      const currentIds = services.map(s => `${s.std}-${s.destination[0]?.locationName}`);
+      const newIds = newServices.map(s => `${s.std}-${s.destination[0]?.locationName}`);
+      const disappearedIds = currentIds.filter(id => !newIds.includes(id));
+
+      // Animate disappeared services
+      disappearedIds.forEach(id => removeDisappearedService(id));
+
+      // Update services array
+      services = newServices;
+
+      // Render new services
+      newServices.forEach(s => {
+        const id = `${s.std}-${s.destination[0]?.locationName}`;
+        if (!document.querySelector(`.departure-row[data-id="${id}"]`)) {
+          const row = document.createElement('div');
+          row.classList.add('departure-row');
+          row.dataset.id = id;
+          fillRow(row, s);
+
+          row.style.transform = 'translateX(-100%)';
+          row.style.opacity = '0';
+          container.appendChild(row);
+
+          const rowBottom = row.getBoundingClientRect().bottom;
+          if (rowBottom > window.innerHeight - 75) {
+            container.removeChild(row);
+            return;
+          }
+
+          requestAnimationFrame(() => {
+            row.style.transition = 'transform 0.5s ease-out, opacity 0.5s ease-out';
+            row.style.transform = 'translateX(0)';
+            row.style.opacity = '1';
+          });
+
+          setTimeout(() => {
+            row.style.transition = '';
+          }, 600);
+        }
+      });
+
+      // Update header title
+      headerTitle.textContent = `${locationName} Departures`;
+
+      // Check for updates in visible services
+      checkForChanges();
+    })
+    .catch(err => {
+      console.error(err);
+
+      // Clear current departures
+      container.innerHTML = '';
+      services = [];
+      visibleServices = [];
+      lastVisibleData = {};
+
+      // Show error message
+      if (noServicesMessage) noServicesMessage.remove();
+      noServicesMessage = document.createElement('div');
+      noServicesMessage.innerHTML = "We're experiencing a technical issue with this departure board. <br><br> For live departure times direct to your mobile, text this station's name to TrainTracker on 8 49 50.";
+      noServicesMessage.style.position = 'absolute';
+      noServicesMessage.style.fontFamily = "Open Sans";
+      noServicesMessage.style.top = '175px';
+      noServicesMessage.style.left = '50%';
+      noServicesMessage.style.transform = 'translateX(-50%)';
+      noServicesMessage.style.fontSize = '3.5rem';
+      noServicesMessage.style.color = 'white';
+      noServicesMessage.style.textAlign = 'center';
+
+      document.body.appendChild(noServicesMessage);
+    });
+}
+
+
+
+// Initial fetch
+fetchDepartures();
+
+// Refresh every 10 seconds
+setInterval(fetchDepartures, 10000);
+
+// Re-render when window size changes
+window.addEventListener('resize', renderRows);
+
+function getOrdinal(n) {
+  const s = ["th", "st", "nd", "rd"],
+        v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function updateFooterDate() {
+  const now = new Date();
+  const weekday = now.toLocaleDateString('en-GB', { weekday: 'long' });
+  const day = getOrdinal(now.getDate());
+  const month = now.toLocaleDateString('en-GB', { month: 'long' });
+  const year = now.getFullYear();
+  
+  footerMessage.textContent = `${weekday} ${day} ${month} ${year}`;
+}
+
+// Initial set
+updateFooterDate();
+
+</script>
+
+
+
+</body>
+</html>
