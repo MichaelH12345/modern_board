@@ -295,7 +295,7 @@ function fillRow(row, service) {
 
   const platform = document.createElement('div');
   platform.classList.add('platform');
-  platform.textContent = service.platform || '-';
+  platform.textContent = service.platform || '';
   row.appendChild(platform);
 }
 
