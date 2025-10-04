@@ -4,377 +4,284 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Departures</title>
+
 <style>
   @font-face {
     font-family: 'Open Sans Bold';
     src: url('https://raw.githubusercontent.com/MichaelH12345/simple-departure-board/main/Open%20Sans%20Bold.ttf') format('truetype');
-    font-weight: bold;
-    font-style: normal;
   }
-
-    @font-face {
+  @font-face {
     font-family: 'Open Sans';
     src: url('https://raw.githubusercontent.com/MichaelH12345/simple-departure-board/main/Open%20Sans.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
-  }
-
-    @font-face {
-    font-family: 'Open Sans Semibold';
-    src: url('https://raw.githubusercontent.com/MichaelH12345/simple-departure-board/main/Open%20Sans%20Semibold.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
   }
 
   body {
     margin: 0;
-    font-family: Arial, sans-serif;
     background-color: black;
     color: white;
+    font-family: 'Open Sans', sans-serif;
     overflow: hidden;
   }
 
   header {
     background-color: #001f4d;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
     border-bottom: 4px solid white;
-    font-family: 'Open Sans', sans-serif;
-    position: relative;
+    padding-left: 15px;
   }
 
   .header-title {
-    font-family: 'Open Sans Bold', sans-serif;
-    font-weight: bold;
+    font-family: 'Open Sans Bold';
     font-size: 4rem;
-    padding-left: 15px;
     margin: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .header-row {
     display: flex;
     align-items: center;
-    padding-left: 15px;
     font-size: 2.5rem;
-    margin: 0;
-    position: relative;
   }
 
-  .time { margin-left: 0; }
-  .destination { flex: 1; margin-left: 75px; }
-  .status { position: absolute; right: 15px; }
-  .platform-header { position: absolute; right: 300px; }
+.time { 
+  width: 100px; 
+}
+
+.destination { 
+  flex: 1; 
+  margin-left: 50px; 
+}
+
+.platform-header { 
+  width: 150px; 
+  position: absolute;
+  right: 275px;
+  text-align: right;
+}
+
+.status { 
+  width: 150px; 
+  position: absolute;
+  right: 15px;
+  text-align: right;
+}
+
 
   .departure-row {
     display: flex;
     align-items: flex-start;
     font-size: 3rem;
-    padding: 5px 15px;
     border-bottom: 3px solid grey;
-    flex-wrap: wrap;
-    line-height: 1.3;
-    font-family: 'Open Sans', sans-serif;
+    padding: 5px 15px;
     position: relative;
-    transition: transform 1s ease-in, opacity 1s ease-in;
-  }
-
-  .destination-box { flex: 1; margin-left: 42.5px; }
-  .expected { position: absolute; right: 15px; }
-  .platform { position: absolute; right: 300px; }
-
-  @media (max-width: 600px) {
-    .header-title { font-size: 3rem; }
-    .header-row { font-size: 1.8rem; }
-    .departure-row { font-size: 2rem; }
-  }
-
-  @keyframes fade {
-    0%   { opacity: 0; }
-    50%  { opacity: 1; }
-    100% { opacity: 0; }
+    line-height: 1.3;
+    transition: transform 0.6s ease-in-out;
   }
 
   .slide-out {
     transform: translateX(100%);
-    transition: transform 0.75s ease-in;
   }
 
-  /* Start off-screen left */
-  .slide-in-left {
+  .slide-in {
     transform: translateX(-100%);
+    animation: slideIn 0.6s forwards ease-in-out;
   }
 
-  /* Slide in from left to original position */
-  .slide-in-left-active {
-    transform: translateX(0);
-    transition: transform 0.8s ease-out;
+  @keyframes slideIn {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
   }
 
-  /* New footer-page style (like footer-time but on left) */
-<style>
-#footer-page {
-  position: fixed;
-  left: 15px;               /* aligned left */
-  top: 0;                   /* inside the header/footer as needed */
-  font-family: 'Open Sans', sans-serif; /* same as footer-time */
-  font-weight: bold;
-  font-size: 3.25rem;
-  color: white;
-  white-space: nowrap;
-  padding: 15px 0;          /* optional vertical padding */
-}
+  .destination-box { flex: 1; margin-left: 25px; }
 
-
-footer {
-  position: fixed;
-  bottom: 0;
-  right: 0;
-  width: 100%;
-  height: 87.5px;
-  background-color: #001f4d;
-  border-top: 4px solid white;
-  display: flex;
-  align-items: center;      /* vertical centering */
-  justify-content: space-between; /* spread items */
-  padding: 0 15px;
-  box-sizing: border-box;
-}
-
-
-  #footer-time {
-    font-family: 'Open Sans', sans-serif;
-    font-weight: bold;
-    font-size: 3.5rem;
-    color: white;
-    white-space: nowrap;
+  .secondary-info {
+    font-size: 3rem;
   }
 
-  /* "Time now:" text is smaller */
-  #footer-time .label {
-    font-family: 'Open Sans', sans-serif;
-    font-weight: normal;      
-    font-size: 60%; /* 75% of main time font size */
-  }
+  .platform { position: absolute; right: 275px; }
+  .expected { position: absolute; right: 15px; }
 
-  #footer-time .value {
-    margin-left: -5px;
+  footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    height: 87.5px;
+    background-color: #001f4d;
+    border-top: 4px solid white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 15px;
+    box-sizing: border-box;
   }
 
   #footer-message {
-  font-family: 'Open Sans', sans-serif;
-  font-weight: normal;           /* same weight as footer-time label */
-  font-size: 2.5rem;            /* same size as footer-time */
-  color: white;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 75%;                /* prevent overlap with time */
-}
+    font-size: 2.5rem;
+    max-width: 75%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
+  #footer-page {
+    font-size: 3rem;
+  }
+
+  #footer-time {
+    font-size: 3.5rem;
+    font-weight: bold;
+  }
+
+  #footer-time .label {
+    font-size: 60%;
+    font-weight: normal;
+  }
+
+  @keyframes fade {
+    0% { opacity: 0; }
+    50% { opacity: 1; }
+    100% { opacity: 0; }
+  }
 </style>
 </head>
+
 <body>
   <header>
-    <div class="header-title" id="header-title"> stationName Departures</div>
+    <div class="header-title" id="header-title">Station Departures</div>
     <div class="header-row">
       <div class="time">Time</div>
       <div class="destination">Destination</div>
-      <div class="platform-header">Platform</div>
-      <div class="status">Expected</div>
+      <div class="platform-header">Plat</div>
+      <div class="status">Status</div>
     </div>
   </header>
 
   <div id="departures-container"></div>
-<footer>
-  <div id="footer-message">Storm Floris may impact your journey today: check before you travel</div>
-  <div id="footer-page"></div>
-  <div id="footer-time">
-    <span class="label">Time now</span>
-    <span id="footer-time-value" class="value"></span>
-  </div>
-</footer>
 
-</body>
-</html>
-
-
+  <footer>
+    <div id="footer-message"></div>
+    <div id="footer-page"></div>
+    <div id="footer-time">
+      <span class="label">Time now </span>
+      <span id="footer-time-value"></span>
+    </div>
+  </footer>
 
 <script>
-
-
+  let serviceStability = {}; // key: serviceId, value: {count, lastEtd}
+  
+const container = document.getElementById('departures-container');
 const footerMessage = document.getElementById('footer-message');
-let incidents = [];
-let currentIncidentIndex = 0;
-
 const footerTimeValue = document.getElementById('footer-time-value');
+const headerTitle = document.getElementById('header-title');
+
+let currentStationCode = 'CAR';
+let services = [];
+let previousServices = [];
+let visibleServices = [];
+let expiredServices = new Set();
 
 function updateFooterTime() {
   const now = new Date();
-  const hours = now.getHours().toString().padStart(2,'0');
-  const minutes = now.getMinutes().toString().padStart(2,'0');
-  const seconds = now.getSeconds().toString().padStart(2,'0');
-  footerTimeValue.textContent = `${hours}:${minutes}:${seconds}`;
+  footerTimeValue.textContent = now.toLocaleTimeString('en-GB', { hour12: false });
 }
-
-// Initial set
+setInterval(updateFooterTime, 1000);
 updateFooterTime();
 
-// Update every second
-setInterval(updateFooterTime, 1000);
+function updateFooterDate() {
+  const now = new Date();
+  const weekday = now.toLocaleDateString('en-GB', { weekday: 'long' });
+  const day = now.getDate();
+  const month = now.toLocaleDateString('en-GB', { month: 'long' });
+  const year = now.getFullYear();
+  footerMessage.textContent = `${weekday} ${day} ${month} ${year}`;
+}
+updateFooterDate();
 
-
-const container = document.getElementById('departures-container');
-const headerTitle = document.getElementById('header-title');
-
-let services = [];
-let visibleServices = [];
-let lastVisibleData = {}; // store last known state of visible services
-
-// Fill a row with service data
 function fillRow(row, service) {
   row.innerHTML = '';
 
-  const scheduled = document.createElement('div');
-  scheduled.classList.add('scheduled');
-  scheduled.textContent = service.std || '';
-  row.appendChild(scheduled);
+  const time = document.createElement('div');
+  time.textContent = service.std || '';
+  row.appendChild(time);
 
-  const dest = document.createElement('div');
-  dest.classList.add('destination-box');
+  const destBox = document.createElement('div');
+  destBox.classList.add('destination-box');
   const destMain = document.createElement('div');
-  destMain.textContent = service.destination[0]?.locationName || '';
-  dest.appendChild(destMain);
+  destMain.textContent = service.destination?.[0]?.locationName || '';
+  destBox.appendChild(destMain);
 
-  if (service.destination[0]?.via) {
+  if (service.destination?.[0]?.via) {
     const viaLine = document.createElement('div');
     viaLine.textContent = service.destination[0].via;
-    dest.appendChild(viaLine);
+    viaLine.classList.add('secondary-info');
+    destBox.appendChild(viaLine);
   }
 
   if (service.length && service.length !== 0) {
     const lengthLine = document.createElement('div');
     lengthLine.textContent = `This train has ${service.length} coaches.`;
-    dest.appendChild(lengthLine);
+    lengthLine.classList.add('secondary-info');
+    destBox.appendChild(lengthLine);
   }
 
   if (service.cancelReason || service.delayReason) {
     const reasonLine = document.createElement('div');
     if (service.cancelReason) {
-      reasonLine.textContent = service.cancelReason.replace(
-        'This service has been cancelled because of','Service cancelled due to'
-      ) + '.';
+      reasonLine.textContent = service.cancelReason.replace('This service has been cancelled because of', 'Service cancelled due to') + '.';
     } else if (service.delayReason) {
-      reasonLine.textContent = service.delayReason.replace(
-        'This service has been delayed by','Service delayed due to'
-      ) + '.';
+      reasonLine.textContent = service.delayReason.replace('This service has been delayed by', 'Service delayed due to') + '.';
     }
-    dest.appendChild(reasonLine);
+    reasonLine.classList.add('secondary-info');
+    destBox.appendChild(reasonLine);
   }
-  row.appendChild(dest);
 
-  const expected = document.createElement('div');
-  expected.classList.add('expected');
-
-  if (service.etd === 'Cancelled') {
-    expected.textContent = 'Cancelled';
-    expected.style.animation = 'fade 2s infinite';
-    expected.style.fontWeight = 'bold';
-    expected.style.color = '#00bfff';
-  } else if (service.etd && service.etd !== 'On time') {
-    expected.textContent = (service.etd !== 'Delayed' ? '' : '') + service.etd;
-    expected.style.fontWeight = 'bold';
-    expected.style.color = '#00bfff';
-  } else {
-    expected.textContent = service.etd || '';
-  }
-  row.appendChild(expected);
+  row.appendChild(destBox);
 
   const platform = document.createElement('div');
   platform.classList.add('platform');
   platform.textContent = service.platform || '';
   row.appendChild(platform);
+
+const expected = document.createElement('div');
+expected.classList.add('expected');
+
+// Check if ETD is a time
+if (/^\d{2}:\d{2}$/.test(service.etd)) {
+  expected.textContent = `Exp ${service.etd}`;
+} else {
+  expected.textContent = service.etd || 'On time';
 }
 
-// Animate a row update with slide-out → content update → slide-in from left
-function animateUpdate(row, newContentFn) {
-  row.style.transition = 'transform 0.5s ease-in';
-  row.style.transform = 'translateX(100%)';
 
-  setTimeout(() => {
-    row.style.transition = 'none';
-    row.style.transform = 'translateX(-100%)';
-    newContentFn(row);
-    void row.offsetWidth; // force reflow
-    row.style.transition = 'transform 0.5s ease-out';
-    row.style.transform = 'translateX(0)';
+  if (service.etd === 'Cancelled') {
+    expected.style.animation = 'fade 2s infinite';
+    expected.style.color = '#00bfff';
+    expected.style.fontWeight = 'bold';
+  } else if (service.etd && service.etd !== 'On time') {
+    expected.style.color = '#00bfff';
+    expected.style.fontWeight = 'bold';
+  } else {
+    expected.style.color = 'white';
+    expected.style.animation = 'none';
+  }
 
-    setTimeout(() => {
-      row.style.transition = '';
-    }, 800);
-  }, 750);
+  row.appendChild(expected);
 }
 
-// Compare visible services with previous state
-function checkForChanges() {
-  visibleServices.forEach(service => {
-    const id = `${service.std}-${service.destination[0]?.locationName}`;
-    const fields = {
-      destination: service.destination[0]?.locationName || '',
-      platform: service.platform || '',
-      etd: service.etd || '',
-      std: service.std || '',
-      cancelReason: service.cancelReason || '',
-      delayReason: service.delayReason || ''
-    };
-
-    const row = document.querySelector(`.departure-row[data-id="${id}"]`);
-
-    if (!lastVisibleData[id]) {
-      lastVisibleData[id] = fields;
-    } else {
-      let hasChanged = false;
-      let onlyPlatformChanged = true;
-      for (let key in fields) {
-        if (fields[key] !== lastVisibleData[id][key]) {
-          if (key !== 'platform') onlyPlatformChanged = false;
-          hasChanged = true;
-        }
-      }
-
-      if (hasChanged && row) {
-        if (onlyPlatformChanged && fields.platform !== '-') {
-          const platformEl = row.querySelector('.platform');
-          if (platformEl) {
-            platformEl.style.transition = '';
-            platformEl.style.animation = 'fade 2s infinite';
-            platformEl.textContent = fields.platform;
-          }
-          lastVisibleData[id].platform = fields.platform;
-        } else {
-          animateUpdate(row, (r) => fillRow(r, service));
-          lastVisibleData[id] = fields;
-        }
-      }
-    }
-  });
-}
-
-// Render departures with 75px margin at bottom
 function renderRows() {
   container.innerHTML = '';
-  const pageHeight = window.innerHeight;
   visibleServices = [];
 
+  const pageHeight = window.innerHeight;
+  const seen = new Set();
+
   for (let service of services) {
+    const id = `${service.std}-${service.destination?.[0]?.locationName}`;
+    if (expiredServices.has(id) || seen.has(id)) continue; // prevent duplicates
+    seen.add(id);
+
     const row = document.createElement('div');
     row.classList.add('departure-row');
-    row.dataset.id = `${service.std}-${service.destination[0]?.locationName}`;
     fillRow(row, service);
-
     container.appendChild(row);
 
     const rowBottom = row.getBoundingClientRect().bottom;
@@ -387,218 +294,181 @@ function renderRows() {
   }
 }
 
-function removeDisappearedService(disappearedId) {
-  const row = document.querySelector(`.departure-row[data-id="${disappearedId}"]`);
-  if (!row) return;
-
-  const shiftHeight = row.offsetHeight;
-
-  // Slide out the disappeared row (no fade, just slide right)
-  row.style.transition = 'transform 0.5s ease';
-  row.style.transform = 'translateX(100%)';
-
-  setTimeout(() => {
-    // Create placeholder with same height
-    const placeholder = document.createElement('div');
-    placeholder.style.height = shiftHeight + 'px';
-    placeholder.style.transition = 'height 0.5s ease';
-    placeholder.style.overflow = 'hidden';
-
-    // Insert placeholder where the row was
-    container.insertBefore(placeholder, row.nextSibling);
-
-    // Remove the actual row
-    container.removeChild(row);
-
-    // Animate placeholder shrinking
-    requestAnimationFrame(() => {
-      placeholder.style.height = '0px';
-    });
-
-    // Cleanup placeholder after animation
-    setTimeout(() => {
-      container.removeChild(placeholder);
-    }, 600);
-
-  }, 500); // wait for slide-out to finish
-}
-
-
-let currentStationCode = 'CAR'; // default station code
-
-// Make header clickable to change station
-headerTitle.style.cursor = 'pointer';
-headerTitle.addEventListener('click', () => {
-  const code = prompt('Enter a station code (e.g., GTW, EUS, LST):', currentStationCode);
-  if (code) {
-    currentStationCode = code.toUpperCase();
-
-    // Clear current departures
-    container.innerHTML = '';
-    services = [];
-    visibleServices = [];
-    lastVisibleData = {};
-
-    // Fetch and render departures for new station
-    fetchDepartures();
-  }
-});
-
-// Container for "no services" or error message
-let noServicesMessage = null;
-
 function fetchDepartures() {
   fetch(`https://huxley2.azurewebsites.net/departures/${currentStationCode}`)
     .then(res => res.json())
     .then(data => {
-      const newServices = data.trainServices || [];
-      const locationName = data.locationName || currentStationCode;
+      let newServices = data.trainServices || [];
+      const stationName = data.locationName || currentStationCode;
+      headerTitle.textContent = `${stationName} Departures`;
 
-      // Clear previous message if exists
-      if (noServicesMessage) {
-        noServicesMessage.remove();
-        noServicesMessage = null;
-      }
+      // Sort by time
+      newServices.sort((a,b)=>{
+        const [h1,m1] = a.std.split(':').map(Number);
+        const [h2,m2] = b.std.split(':').map(Number);
+        return (h1*60+m1) - (h2*60+m2);
+      });
 
-      if (newServices.length === 0) {
-        // Show "no services" message
-        noServicesMessage = document.createElement('div');
-        noServicesMessage.textContent = 'There are no services scheduled to depart from this station in the next 2 hours.';
-        noServicesMessage.style.position = 'absolute';
-        noServicesMessage.style.fontFamily = "Open Sans";
-        noServicesMessage.style.top = '175px';
-        noServicesMessage.style.left = '50%';
-        noServicesMessage.style.transform = 'translateX(-50%)';
-        noServicesMessage.style.fontSize = '3.5rem';
-        noServicesMessage.style.color = 'white';
-        noServicesMessage.style.textAlign = 'center';
+      // Remove duplicates
+      const seen = new Set();
+      newServices = newServices.filter(s => {
+        const id = `${s.std}-${s.destination?.[0]?.locationName}`;
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
 
-        document.body.appendChild(noServicesMessage);
-
-        // Stop further processing
-        container.innerHTML = '';
-        services = [];
-        visibleServices = [];
-        lastVisibleData = {};
-        headerTitle.textContent = `${locationName} Departures`;
+      // If no previous data, just render
+      if (previousServices.length === 0) {
+        services = newServices;
+        previousServices = JSON.parse(JSON.stringify(newServices));
+        renderRows();
         return;
       }
 
-      // Detect disappeared services
-      const currentIds = services.map(s => `${s.std}-${s.destination[0]?.locationName}`);
-      const newIds = newServices.map(s => `${s.std}-${s.destination[0]?.locationName}`);
-      const disappearedIds = currentIds.filter(id => !newIds.includes(id));
+      const rows = Array.from(container.getElementsByClassName('departure-row'));
 
-      // Animate disappeared services
-      disappearedIds.forEach(id => removeDisappearedService(id));
+      // Handle updated services
+      newServices.forEach((service, i) => {
+        const oldService = previousServices.find(s =>
+          s.std === service.std && s.destination?.[0]?.locationName === service.destination?.[0]?.locationName
+        );
 
-      // Update services array
-      services = newServices;
+        if (oldService) {
+          const etdChanged = service.etd !== oldService.etd;
+          const cancelChanged = service.cancelReason !== oldService.cancelReason;
+          const delayChanged = service.delayReason !== oldService.delayReason;
 
-      // Sort services by scheduled time (std)
-services.sort((a, b) => {
-  const timeA = a.std.split(':').map(Number);
-  const timeB = b.std.split(':').map(Number);
-  return timeA[0]*60 + timeA[1] - (timeB[0]*60 + timeB[1]);
-});
-
-
-      // Render new services
-      newServices.forEach(s => {
-        const id = `${s.std}-${s.destination[0]?.locationName}`;
-        if (!document.querySelector(`.departure-row[data-id="${id}"]`)) {
-          const row = document.createElement('div');
-          row.classList.add('departure-row');
-          row.dataset.id = id;
-          fillRow(row, s);
-
-          row.style.transform = 'translateX(-100%)';
-          row.style.opacity = '0';
-          container.appendChild(row);
-
-          const rowBottom = row.getBoundingClientRect().bottom;
-          if (rowBottom > window.innerHeight - 75) {
-            container.removeChild(row);
-            return;
+          if (etdChanged || cancelChanged || delayChanged) {
+            const row = rows[i];
+            if (row) {
+              row.classList.add('slide-out');
+              setTimeout(() => {
+                fillRow(row, service);
+                row.classList.remove('slide-out');
+                row.classList.add('slide-in');
+                setTimeout(() => row.classList.remove('slide-in'), 600);
+              }, 600);
+            }
           }
-
-          requestAnimationFrame(() => {
-            row.style.transition = 'transform 0.5s ease-out';
-            row.style.transform = 'translateX(0)';
-            row.style.opacity = '1';
-          });
-
-          setTimeout(() => {
-            row.style.transition = '';
-          }, 600);
         }
       });
 
-      // Update header title
-      headerTitle.textContent = `${locationName} Departures`;
 
-      // Check for updates in visible services
-      checkForChanges();
+// Handle removed services
+const currentIds = newServices.map(s => `${s.std}-${s.destination?.[0]?.locationName}`);
+rows.forEach((row, index) => {
+  const rowId = `${services[index]?.std}-${services[index]?.destination?.[0]?.locationName}`;
+  if (!currentIds.includes(rowId)) {
+    // Slide out the row
+    row.classList.add('slide-out');
+
+    // After slide-out animation, remove the row and add placeholder
+    setTimeout(() => {
+      const rowHeight = row.offsetHeight;
+
+      // Remove the row
+      if (row.parentNode) container.removeChild(row);
+
+      // Create a placeholder div with the same height
+      const placeholder = document.createElement('div');
+      placeholder.style.height = `${rowHeight}px`;
+      placeholder.style.transition = 'height 0.5s ease';
+      placeholder.style.background = 'transparent'; // invisible but occupies space
+
+      // Insert placeholder where the row was
+      container.insertBefore(placeholder, container.children[index]);
+
+      // Animate placeholder height to 0
+      setTimeout(() => {
+        placeholder.style.height = '0px';
+
+        // Remove placeholder after animation
+        setTimeout(() => {
+          if (placeholder.parentNode) container.removeChild(placeholder);
+
+          // 1 second after placeholder animation ends, check API and add next service if space
+          setTimeout(addNextAvailableService, 10);
+
+        }, 500); // match placeholder transition duration
+      }, 50); // small delay to allow browser to render placeholder
+    }, 500); // wait for slide-out duration
+  }
+});
+
+// Helper function: fetch new services and add one if space available
+async function addNextAvailableService() {
+  try {
+    const res = await fetch(`https://huxley2.azurewebsites.net/departures/${currentStationCode}`);
+    const data = await res.json();
+    const newServices = data.trainServices || [];
+
+    // Filter out already visible or expired services
+    const seenIds = new Set(visibleServices.map(s => `${s.std}-${s.destination?.[0]?.locationName}`));
+    const availableServices = newServices.filter(s => {
+      const id = `${s.std}-${s.destination?.[0]?.locationName}`;
+      return !seenIds.has(id) && !expiredServices.has(id);
+    });
+
+    if (availableServices.length === 0) return;
+
+    // Check if there is vertical space for another row
+    const pageHeight = window.innerHeight;
+    const lastRow = container.lastElementChild;
+    const lastRowBottom = lastRow ? lastRow.getBoundingClientRect().bottom : 0;
+
+    if (lastRowBottom + 60 < pageHeight - 75) { // 60px estimate for row height
+      const service = availableServices[0];
+      const newRow = createServiceRow(service);
+      newRow.classList.add('slide-in');
+      container.appendChild(newRow);
+      visibleServices.push(service);
+
+      setTimeout(() => newRow.classList.remove('slide-in'), 600);
+    }
+  } catch (err) {
+    console.error('Error fetching additional service:', err);
+  }
+}
+
+// Helper to create a row element (used in addNextAvailableService)
+function createServiceRow(service) {
+  const row = document.createElement('div');
+  row.classList.add('departure-row');
+  fillRow(row, service);
+  return row;
+}
+
+
+
+      services = newServices;
+      previousServices = JSON.parse(JSON.stringify(newServices));
     })
     .catch(err => {
       console.error(err);
-
-      // Clear current departures
-      container.innerHTML = '';
-      services = [];
-      visibleServices = [];
-      lastVisibleData = {};
-
-      // Show error message
-      if (noServicesMessage) noServicesMessage.remove();
-      noServicesMessage = document.createElement('div');
-      noServicesMessage.innerHTML = "We're experiencing a technical issue with this departure board. <br><br> For live departure times direct to your mobile, text this station's name to TrainTracker on 8 49 50.";
-      noServicesMessage.style.position = 'absolute';
-      noServicesMessage.style.fontFamily = "Open Sans";
-      noServicesMessage.style.top = '175px';
-      noServicesMessage.style.left = '50%';
-      noServicesMessage.style.transform = 'translateX(-50%)';
-      noServicesMessage.style.fontSize = '3.5rem';
-      noServicesMessage.style.color = 'white';
-      noServicesMessage.style.textAlign = 'center';
-
-      document.body.appendChild(noServicesMessage);
+      container.innerHTML = `<div style="text-align:center;font-size:3rem;margin-top:150px;">Error loading departures.</div>`;
     });
 }
 
-
-
-// Initial fetch
 fetchDepartures();
-
-// Refresh every 10 seconds
 setInterval(fetchDepartures, 10000);
-
-// Re-render when window size changes
 window.addEventListener('resize', renderRows);
 
-function getOrdinal(n) {
-  const s = ["th", "st", "nd", "rd"],
-        v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
+headerTitle.addEventListener('click', async () => {
+  const code = prompt('Enter a station code (e.g., EUS, LST, GTW):', currentStationCode);
+  if (code) {
+    currentStationCode = code.toUpperCase();
+    expiredServices.clear();        // clear expired services
+    previousServices = [];          // reset previous services
+    services = [];                  // reset current services
+    container.innerHTML = '';       // clear displayed rows
 
-function updateFooterDate() {
-  const now = new Date();
-  const weekday = now.toLocaleDateString('en-GB', { weekday: 'long' });
-  const day = getOrdinal(now.getDate());
-  const month = now.toLocaleDateString('en-GB', { month: 'long' });
-  const year = now.getFullYear();
-  
-  footerMessage.textContent = `${weekday} ${day} ${month} ${year}`;
-}
+    // Fetch departures for the new station
+    await fetchDepartures();
+  }
+});
 
-// Initial set
-updateFooterDate();
 
 </script>
-
-
-
 </body>
 </html>
