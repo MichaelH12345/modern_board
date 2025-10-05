@@ -12,8 +12,9 @@
   }
   @font-face {
     font-family: 'Open Sans';
-    src: url('https://raw.githubusercontent.com/MichaelH12345/simple-departure-board/main/Open%20Sans%20Regular.ttf.ttf') format('truetype');
+    src: url('https://raw.githubusercontent.com/MichaelH12345/simple-departure-board/main/Open%20Sans%20Regular.ttf') format('truetype');
   }
+  
 
   body {
     margin: 0;
@@ -127,12 +128,12 @@
 
   #footer-time {
     font-size: 3.5rem;
-    font-weight: bold;
+    font-family: 'Open Sans Bold';
   }
 
   #footer-time .label {
     font-size: 60%;
-    font-weight: normal;
+    font-family: 'Open Sans';
   }
 
   @keyframes fade {
@@ -177,6 +178,22 @@ let services = [];
 let previousServices = [];
 let visibleServices = [];
 let expiredServices = new Set();
+let etdHistory = {}; // ✅ defined earlier
+
+function isTime(value) {
+  // ✅ New helper to detect time strings like "14:37"
+  return /^\d{2}:\d{2}$/.test(value);
+}
+
+function timeToDate(timeStr) {
+  // Converts a "HH:MM" time string to a Date object for today
+  const now = new Date();
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+  return d;
+}
+
+
 
 function updateFooterTime() {
   const now = new Date();
@@ -264,42 +281,23 @@ if (/^\d{2}:\d{2}$/.test(service.etd)) {
 }
 
 
-  if (service.etd === 'Cancelled') {
-    expected.style.animation = 'fade 2s infinite';
-    expected.style.color = '#00bfff';
-    expected.style.fontWeight = 'bold';
-  } else if (service.etd && service.etd !== 'On time') {
-    expected.style.color = '#00bfff';
-    expected.style.fontWeight = 'bold';
-  } else {
-    expected.style.color = 'white';
-    expected.style.animation = 'none';
-  }
+if (service.etd === 'Cancelled') {
+  expected.style.animation = 'fade 2s infinite';
+  expected.style.color = '#00bfff';
+  expected.style.fontFamily = 'Open Sans Bold'; // ✅ use bold font file
+} else if (service.etd && service.etd !== 'On time') {
+  expected.style.color = '#00bfff';
+  expected.style.fontFamily = 'Open Sans Bold'; // ✅ use bold font file
+} else {
+  expected.style.color = 'white';
+  expected.style.animation = 'none';
+  expected.style.fontFamily = 'Open Sans'; // ✅ revert to normal font
+}
+
 
   row.appendChild(expected);
 }
 
-function checkServiceExpiry() {
-  const now = new Date();
-  for (let service of services) {
-    const id = `${service.std}-${service.destination?.[0]?.locationName}`;
-    if (expiredServices.has(id)) continue;
-    if (!etdHistory[id]) etdHistory[id] = [];
-    const history = etdHistory[id];
-    history.push(service.etd);
-    if (history.length > 15) history.shift();
-
-    const stableOnTime = history.every(v => v === 'On time');
-    const stableNumber = history.every(v => v === history[0] && isTime(v));
-
-    const stdDate = timeToDate(service.std);
-    const etdDate = isTime(service.etd) ? timeToDate(service.etd) : null;
-
-    if (stableOnTime && now - stdDate > 30_000) removeService(id);
-    else if (stableNumber && etdDate && now - etdDate > 30_000) removeService(id);
-  }
-}
-setInterval(checkServiceExpiry, 1000);
 
 function renderRows() {
   container.innerHTML = '';
