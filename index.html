@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -178,7 +179,9 @@ let services = [];
 let previousServices = [];
 let visibleServices = [];
 let expiredServices = new Set();
-let etdHistory = {}; // ✅ defined earlier
+let etdHistory = {};       // already exists
+let etdCheckHistory = {};  // <--- Add this line here
+
 
 function isTime(value) {
   // ✅ New helper to detect time strings like "14:37"
@@ -428,7 +431,53 @@ rows.forEach((row, index) => {
   }
 });
 
-// Helper function: fetch new services and add one if space available
+function checkExpiredServices() {
+  const now = new Date();
+
+  visibleServices.forEach((service, index) => {
+    const id = `${service.std}-${service.destination?.[0]?.locationName}`;
+
+    // Initialize history
+    if (!etdCheckHistory[id]) etdCheckHistory[id] = [];
+
+    // Record current ETD
+    etdCheckHistory[id].push(service.etd);
+    if (etdCheckHistory[id].length > 5) etdCheckHistory[id].shift();
+
+    const stdDate = timeToDate(service.std);
+    const etdDate = isTime(service.etd) ? timeToDate(service.etd) : null;
+
+    // 1️⃣ On time auto-expiry
+    const allOnTime = etdCheckHistory[id].length === 5 && etdCheckHistory[id].every(e => e === 'On time');
+    if (allOnTime && now - stdDate > 15000 && !expiredServices.has(id)) {
+      expireService(id, index);
+    }
+
+    // 2️⃣ ETD number auto-expiry
+    const allSameETD = etdCheckHistory[id].length === 5 && etdCheckHistory[id].every(e => e === etdCheckHistory[id][0] && e !== 'On time');
+    if (allSameETD && etdDate && now - etdDate > 15000 && !expiredServices.has(id)) {
+      expireService(id, index);
+    }
+  });
+}
+
+function expireService(id, index) {
+  const row = container.children[index];
+  if (!row) return;
+  expiredServices.add(id);
+
+  row.classList.add('slide-out');
+  setTimeout(() => {
+    if (row.parentNode) container.removeChild(row);
+    // Wait 2s, then try to add a new service if it fits
+    setTimeout(addNextAvailableService, 500);
+  }, 600);
+}
+
+// Call checkExpiredServices every second
+setInterval(checkExpiredServices, 1000);
+
+// Helper function: fetch new services and add as many as fit on screen
 async function addNextAvailableService() {
   try {
     const res = await fetch(`https://huxley2.azurewebsites.net/departures/${currentStationCode}`);
@@ -444,24 +493,43 @@ async function addNextAvailableService() {
 
     if (availableServices.length === 0) return;
 
-    // Check if there is vertical space for another row
     const pageHeight = window.innerHeight;
-    const lastRow = container.lastElementChild;
-    const lastRowBottom = lastRow ? lastRow.getBoundingClientRect().bottom : 0;
+    let lastRow = container.lastElementChild;
+    let lastRowBottom = lastRow ? lastRow.getBoundingClientRect().bottom : 0;
 
-    if (lastRowBottom + 60 < pageHeight - 75) { // 60px estimate for row height
-      const service = availableServices[0];
+    // Keep adding rows until we run out of space or services
+    for (let i = 0; i < availableServices.length; i++) {
+      const service = availableServices[i];
+      const testRow = createServiceRow(service);
+      testRow.style.visibility = 'hidden';
+      container.appendChild(testRow);
+
+      const testBottom = testRow.getBoundingClientRect().bottom;
+      const fits = testBottom < (pageHeight - 75);
+
+      // Remove test row
+      container.removeChild(testRow);
+      testRow.style.visibility = '';
+
+      if (!fits) break; // stop adding if this one would overflow
+
+      // If it fits, actually add it with animation
       const newRow = createServiceRow(service);
       newRow.classList.add('slide-in');
       container.appendChild(newRow);
       visibleServices.push(service);
 
       setTimeout(() => newRow.classList.remove('slide-in'), 600);
+
+      // Update lastRowBottom for next iteration
+      lastRow = newRow;
+      lastRowBottom = lastRow.getBoundingClientRect().bottom;
     }
   } catch (err) {
     console.error('Error fetching additional service:', err);
   }
 }
+
 
 // Helper to create a row element (used in addNextAvailableService)
 function createServiceRow(service) {
