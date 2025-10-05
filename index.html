@@ -334,7 +334,7 @@ function fetchDepartures() {
       const stationName = data.locationName || currentStationCode;
       headerTitle.textContent = `${stationName} Departures`;
 
-      // Sort by time
+      // Sort by scheduled time
       newServices.sort((a,b)=>{
         const [h1,m1] = a.std.split(':').map(Number);
         const [h2,m2] = b.std.split(':').map(Number);
@@ -348,6 +348,56 @@ function fetchDepartures() {
         if (seen.has(id)) return false;
         seen.add(id);
         return true;
+      });
+
+      // ✅ Maintain ETD history
+      newServices.forEach(service => {
+        const id = `${service.std}-${service.destination?.[0]?.locationName}`;
+        if (!etdHistory[id]) etdHistory[id] = [];
+        etdHistory[id].push(service.etd);
+        if (etdHistory[id].length > 15) etdHistory[id].shift(); // keep last 15
+      });
+
+      // ✅ Detect and remove "departed" services
+      const now = new Date();
+
+      newServices.forEach(service => {
+        const id = `${service.std}-${service.destination?.[0]?.locationName}`;
+        const history = etdHistory[id];
+        if (!history || history.length < 15) return;
+
+        const allSame = history.every(v => v === history[0]);
+        if (!allSame) return;
+
+        let removeAfter = null;
+        if (history[0] === 'On time') {
+          // remove 30s after STD
+          const stdTime = timeToDate(service.std);
+          if (now - stdTime > 30000) removeAfter = 'STD';
+        } else if (/^\d{2}:\d{2}$/.test(history[0])) {
+          // remove 30s after ETD
+          const etdTime = timeToDate(service.etd);
+          if (now - etdTime > 30000) removeAfter = 'ETD';
+        }
+
+        if (removeAfter) {
+          expiredServices.add(id);
+          // Find and slide out the row if visible
+          const rows = Array.from(container.getElementsByClassName('departure-row'));
+          const index = visibleServices.findIndex(
+            s => `${s.std}-${s.destination?.[0]?.locationName}` === id
+          );
+          if (index !== -1 && rows[index]) {
+            const row = rows[index];
+            row.classList.add('slide-out');
+            setTimeout(() => {
+              if (row.parentNode) container.removeChild(row);
+              visibleServices.splice(index, 1);
+              // After 2s, fetch new service if space available
+              setTimeout(addNextAvailableService, 2000);
+            }, 600);
+          }
+        }
       });
 
       // If no previous data, just render
@@ -386,92 +436,29 @@ function fetchDepartures() {
         }
       });
 
-
-// Handle removed services
-const currentIds = newServices.map(s => `${s.std}-${s.destination?.[0]?.locationName}`);
-rows.forEach((row, index) => {
-  const rowId = `${services[index]?.std}-${services[index]?.destination?.[0]?.locationName}`;
-  if (!currentIds.includes(rowId)) {
-    // Slide out the row
-    row.classList.add('slide-out');
-
-    // After slide-out animation, remove the row and add placeholder
-    setTimeout(() => {
-      const rowHeight = row.offsetHeight;
-
-      // Remove the row
-      if (row.parentNode) container.removeChild(row);
-
-      // Create a placeholder div with the same height
-      const placeholder = document.createElement('div');
-      placeholder.style.height = `${rowHeight}px`;
-      placeholder.style.transition = 'height 0.5s ease';
-      placeholder.style.background = 'transparent'; // invisible but occupies space
-
-      // Insert placeholder where the row was
-      container.insertBefore(placeholder, container.children[index]);
-
-      // Animate placeholder height to 0
-      setTimeout(() => {
-        placeholder.style.height = '0px';
-
-        // Remove placeholder after animation
-        setTimeout(() => {
-          if (placeholder.parentNode) container.removeChild(placeholder);
-
-          // 1 second after placeholder animation ends, check API and add next service if space
-          setTimeout(addNextAvailableService, 10);
-
-        }, 500); // match placeholder transition duration
-      }, 50); // small delay to allow browser to render placeholder
-    }, 500); // wait for slide-out duration
-  }
-});
-
-// Helper function: fetch new services and add one if space available
-async function addNextAvailableService() {
-  try {
-    const res = await fetch(`https://huxley2.azurewebsites.net/departures/${currentStationCode}`);
-    const data = await res.json();
-    const newServices = data.trainServices || [];
-
-    // Filter out already visible or expired services
-    const seenIds = new Set(visibleServices.map(s => `${s.std}-${s.destination?.[0]?.locationName}`));
-    const availableServices = newServices.filter(s => {
-      const id = `${s.std}-${s.destination?.[0]?.locationName}`;
-      return !seenIds.has(id) && !expiredServices.has(id);
-    });
-
-    if (availableServices.length === 0) return;
-
-    // Check if there is vertical space for another row
-    const pageHeight = window.innerHeight;
-    const lastRow = container.lastElementChild;
-    const lastRowBottom = lastRow ? lastRow.getBoundingClientRect().bottom : 0;
-
-    if (lastRowBottom + 60 < pageHeight - 75) { // 60px estimate for row height
-      const service = availableServices[0];
-      const newRow = createServiceRow(service);
-      newRow.classList.add('slide-in');
-      container.appendChild(newRow);
-      visibleServices.push(service);
-
-      setTimeout(() => newRow.classList.remove('slide-in'), 600);
-    }
-  } catch (err) {
-    console.error('Error fetching additional service:', err);
-  }
-}
-
-// Helper to create a row element (used in addNextAvailableService)
-function createServiceRow(service) {
-  const row = document.createElement('div');
-  row.classList.add('departure-row');
-  fillRow(row, service);
-  return row;
-}
-
-
+      // Handle removed services from API
+      const currentIds = newServices.map(s => `${s.std}-${s.destination?.[0]?.locationName}`);
+      rows.forEach((row, index) => {
+        const rowId = `${services[index]?.std}-${services[index]?.destination?.[0]?.locationName}`;
+        if (!currentIds.includes(rowId)) {
+          row.classList.add('slide-out');
+          setTimeout(() => {
+            const rowHeight = row.offsetHeight;
+            if (row.parentNode) container.removeChild(row);
+            const placeholder = document.createElement('div');
+            placeholder.style.height = `${rowHeight}px`;
+            placeholder.style.transition = 'height 0.5s ease';
+            container.insertBefore(placeholder, container.children[index]);
+            setTimeout(() => {
+              placeholder.style.height = '0px';
+              setTimeout(() => {
+                if (placeholder.parentNode) container.removeChild(placeholder);
+                setTimeout(addNextAvailableService, 10);
+              }, 500);
+            }, 50);
+          }, 500);
+        }
+      });
 
       services = newServices;
       previousServices = JSON.parse(JSON.stringify(newServices));
