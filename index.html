@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -145,15 +144,15 @@
     100% { opacity: 0; }
   }
 
-  @keyframes platformFlash {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+@keyframes flashPlatform {
+  0% { color: #000000; }
+  50% { color: white; }
+  100% { color: #000000; }
 }
 
 .platform-flash {
-  animation: platformFlash 1s infinite;
+  animation: flashPlatform 2s infinite;
 }
-
 </style>
 </head>
 
@@ -188,6 +187,7 @@ let currentStationCode = 'CAR';
 let services = [];
 let animatedServices = new Set();
 let previousServices = [];
+let previousServicesMap = {};
 let visibleServices = [];
 let expiredServices = new Set();
 let etdHistory = {};
@@ -195,6 +195,27 @@ let etdCheckHistory = {}; // <-- Track last 5 ETDs for each service
 const rows = Array.from(container.getElementsByClassName('departure-row'));
 function isTime(value) {
   return /^\d{2}:\d{2}$/.test(value);
+}
+
+function createServiceRow(service) {
+  const row = document.createElement('div');
+  row.classList.add('departure-row');
+  fillRow(row, service);
+  return row;
+}
+
+function mapServices(services) {
+  const map = {};
+  services.forEach(s => {
+    const id = `${s.std}-${s.destination?.[0]?.locationName}`;
+    map[id] = {
+      etd: s.etd,
+      platform: s.platform,
+      delayReason: s.delayReason,
+      cancelReason: s.cancelReason
+    };
+  });
+  return map;
 }
 
 function timeToDate(timeStr) {
@@ -229,6 +250,18 @@ function updateFooterDate() {
   footerMessage.textContent = `${weekday} ${getOrdinal(day)} ${month}`;
 }
 updateFooterDate();
+
+let flashStartTime = Date.now(); // global flash sync timestamp
+
+function applyFlashing(element) {
+  if (!element) return;
+
+  element.classList.add('platform-flash');
+
+  // Sync all flashing elements to the same animation start
+  const elapsed = (Date.now() - flashStartTime) / 1000; // seconds
+  element.style.animationDelay = `-${elapsed}s`;
+}
 
 function fillRow(row, service) {
   row.innerHTML = '';
@@ -278,17 +311,21 @@ function fillRow(row, service) {
   const expected = document.createElement('div');
   expected.classList.add('expected');
 
-  if (/^\d{2}:\d{2}$/.test(service.etd)) {
-    expected.textContent = `Exp ${service.etd}`;
+  // If etd equals std, treat as 'On time'
+  let etdText = service.etd;
+  if (service.etd === service.std) etdText = 'On time';
+
+  if (/^\d{2}:\d{2}$/.test(etdText)) {
+    expected.textContent = `Exp ${etdText}`;
   } else {
-    expected.textContent = service.etd || 'On time';
+    expected.textContent = etdText || 'On time';
   }
 
-  if (service.etd === 'Cancelled') {
+  if (etdText === 'Cancelled') {
     expected.style.animation = 'fade 2s infinite';
     expected.style.color = '#00bfff';
     expected.style.fontFamily = 'Open Sans Bold';
-  } else if (service.etd && service.etd !== 'On time') {
+  } else if (etdText && etdText !== 'On time') {
     expected.style.color = '#00bfff';
     expected.style.fontFamily = 'Open Sans Bold';
   } else {
@@ -300,30 +337,69 @@ function fillRow(row, service) {
   row.appendChild(expected);
 }
 
-function createServiceRow(service) {
-  const row = document.createElement('div');
-  row.classList.add('departure-row');
-  fillRow(row, service);
-  return row;
+function updateServiceRow(row, newService) {
+  const id = `${newService.std}-${newService.destination?.[0]?.locationName}`;
+  const prev = previousServicesMap[id];
+  if (!prev) return;
+
+  // Normalize ETD
+  const prevETD = (prev.etd === prev.std) ? 'On time' : prev.etd;
+  const newETD = (newService.etd === newService.std) ? 'On time' : newService.etd;
+
+  const platformChanged = prev.platform !== newService.platform;
+  const changed = platformChanged || prevETD !== newETD || prev.delayReason !== newService.delayReason || prev.cancelReason !== newService.cancelReason;
+
+  if (!changed) return;
+
+  // Slide out current row
+  row.classList.add('slide-out');
+
+  setTimeout(() => {
+    // Update row content
+    fillRow(row, newService);
+
+    // Make platform flash if changed or already flashing
+    const platformDiv = row.querySelector('.platform');
+    if (platformChanged || platformDiv.classList.contains('platform-flash')) {
+      platformDiv.classList.add('platform-flash');
+      applyFlashing(platformDiv);
+    }
+
+    // Slide row back in
+    row.classList.remove('slide-out');
+    row.classList.add('slide-in');
+    setTimeout(() => row.classList.remove('slide-in'), 500);
+
+  }, 500);
 }
 
-function renderRows() {
-  const anyExpiring = [...container.children].some(r => r.dataset.expiring === "true");
-  if (anyExpiring) return;
 
+
+
+
+
+function renderRows() {
   container.innerHTML = '';
   visibleServices = [];
 
   const pageHeight = window.innerHeight;
-  const seen = new Set();
+  const seenIds = new Set();
 
-  for (let service of services) {
+  // Sort services by STD before rendering
+  const sortedServices = services
+    .filter(s => !expiredServices.has(`${s.std}-${s.destination?.[0]?.locationName}`))
+    .sort((a, b) => {
+      const [h1, m1] = a.std.split(':').map(Number);
+      const [h2, m2] = b.std.split(':').map(Number);
+      return (h1 * 60 + m1) - (h2 * 60 + m2);
+    });
+
+  for (let service of sortedServices) {
     const id = `${service.std}-${service.destination?.[0]?.locationName}`;
-    if (expiredServices.has(id) || seen.has(id)) continue;
-    seen.add(id);
+    if (seenIds.has(id)) continue;
+    seenIds.add(id);
 
     const row = createServiceRow(service);
-
     container.appendChild(row);
 
     if (row.getBoundingClientRect().bottom > pageHeight - 75) {
@@ -334,7 +410,6 @@ function renderRows() {
     visibleServices.push(service);
   }
 }
-
 
 async function addNextAvailableService() {
   try {
@@ -352,8 +427,7 @@ async function addNextAvailableService() {
 
     const pageHeight = window.innerHeight;
 
-    for (let i = 0; i < availableServices.length; i++) {
-      const service = availableServices[i];
+    for (let service of availableServices) {
       const testRow = createServiceRow(service);
       testRow.style.visibility = 'hidden';
       container.appendChild(testRow);
@@ -368,12 +442,14 @@ async function addNextAvailableService() {
       newRow.classList.add('slide-in');
       container.appendChild(newRow);
       visibleServices.push(service);
+      seenIds.add(`${service.std}-${service.destination?.[0]?.locationName}`);
       setTimeout(() => newRow.classList.remove('slide-in'), 600);
     }
   } catch (err) {
     console.error('Error fetching additional service:', err);
   }
 }
+
 
 function expireService(id, index) {
   const row = container.children[index];
@@ -421,22 +497,27 @@ function checkExpiredServices() {
     const id = `${service.std}-${service.destination?.[0]?.locationName}`;
     if (!etdCheckHistory[id]) etdCheckHistory[id] = [];
     etdCheckHistory[id].push(service.etd);
-    if (etdCheckHistory[id].length > 5) etdCheckHistory[id].shift();
+    if (etdCheckHistory[id].length > 10) etdCheckHistory[id].shift(); // track last 10 API calls
 
     const stdDate = timeToDate(service.std);
     const etdDate = isTime(service.etd) ? timeToDate(service.etd) : null;
 
-    const allOnTime = etdCheckHistory[id].length === 5 && etdCheckHistory[id].every(e => e === 'On time');
-    if (allOnTime && now - stdDate > 30000 && !expiredServices.has(id)) {
+    const last10Same = etdCheckHistory[id].length === 10 && etdCheckHistory[id].every(e => e === etdCheckHistory[id][0]);
+
+    // Case 1: ETD is 'On time'
+    if (last10Same && etdCheckHistory[id][0] === 'On time' && now - stdDate > 30000 && !expiredServices.has(id)) {
       expireService(id, index);
     }
 
-    const allSameETD = etdCheckHistory[id].length === 5 && etdCheckHistory[id].every(e => e === etdCheckHistory[id][0] && e !== 'On time');
-    if (allSameETD && etdDate && now - etdDate > 30000 && !expiredServices.has(id)) {
+    // Case 2: ETD is 'Delayed' or 'Cancelled' (do nothing here)
+    // Case 3: ETD is something else (not 'On time', 'Delayed' or 'Cancelled')
+    const etdText = etdCheckHistory[id][0];
+    if (last10Same && etdText !== 'On time' && etdText !== 'Delayed' && etdText !== 'Cancelled' && etdDate && now - etdDate > 30000 && !expiredServices.has(id)) {
       expireService(id, index);
     }
   });
 }
+
 
 setInterval(checkExpiredServices, 1000);
 
@@ -448,14 +529,7 @@ function fetchDepartures() {
       const stationName = data.locationName || currentStationCode;
       headerTitle.textContent = `${stationName} Departures`;
 
-      // Sort by time
-      newServices.sort((a,b)=>{
-        const [h1,m1] = a.std.split(':').map(Number);
-        const [h2,m2] = b.std.split(':').map(Number);
-        return (h1*60+m1) - (h2*60+m2);
-      });
-
-      // Remove duplicates
+      // Remove duplicates by STD + destination
       const seen = new Set();
       newServices = newServices.filter(s => {
         const id = `${s.std}-${s.destination?.[0]?.locationName}`;
@@ -464,45 +538,28 @@ function fetchDepartures() {
         return true;
       });
 
-      // If no previous data, just render
-      if (previousServices.length === 0) {
-        services = newServices;
-        previousServices = JSON.parse(JSON.stringify(newServices));
-        renderRows();
-        return;
-      }
-
-      const rows = Array.from(container.getElementsByClassName('departure-row'));
-
-      // Handle updated services
-      newServices.forEach((service, i) => {
-        const oldService = previousServices.find(s =>
-          s.std === service.std && s.destination?.[0]?.locationName === service.destination?.[0]?.locationName
-        );
-
-        if (oldService) {
-          const etdChanged = service.etd !== oldService.etd;
-          const cancelChanged = service.cancelReason !== oldService.cancelReason;
-          const delayChanged = service.delayReason !== oldService.delayReason;
-
-          if (etdChanged || cancelChanged || delayChanged) {
-            const row = rows[i];
-            if (row) {
-              row.classList.add('slide-out');
-              setTimeout(() => {
-                fillRow(row, service);
-                row.classList.remove('slide-out');
-                row.classList.add('slide-in');
-                setTimeout(() => row.classList.remove('slide-in'), 600);
-              }, 600);
-            }
-          }
-        }
+      // Sort by STD
+      newServices.sort((a, b) => {
+        const [h1, m1] = a.std.split(':').map(Number);
+        const [h2, m2] = b.std.split(':').map(Number);
+        return (h1 * 60 + m1) - (h2 * 60 + m2);
       });
 
+      // Map previous services for updates
+      previousServicesMap = mapServices(previousServices);
+
+      // Update existing visible rows individually
+      visibleServices.forEach((service, index) => {
+        const row = container.children[index];
+        if (!row) return;
+        const id = `${service.std}-${service.destination?.[0]?.locationName}`;
+        const updatedService = newServices.find(s => `${s.std}-${s.destination?.[0]?.locationName}` === id);
+        if (updatedService) updateServiceRow(row, updatedService);
+      });
 
       services = newServices;
       previousServices = JSON.parse(JSON.stringify(newServices));
+
       renderRows();
     })
     .catch(err => {
@@ -527,6 +584,7 @@ headerTitle.addEventListener('click', async () => {
   }
 });
 </script>
+
 
 
 </body>
