@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -79,14 +80,12 @@
 
   .slide-out {
     transform: translateX(100%);
-    animation: slideOut 0.5s forwards ease-in-out;
   }
 
-.slide-in {
-  transform: translateX(-100%);
-  animation: slideIn 0.5s forwards ease-in-out;
-}
-
+  .slide-in {
+    transform: translateX(-100%);
+    animation: slideIn 0.6s forwards ease-in-out;
+  }
 
   @keyframes slideIn {
     from { transform: translateX(-100%); }
@@ -143,16 +142,6 @@
     50% { opacity: 1; }
     100% { opacity: 0; }
   }
-
-@keyframes flashPlatform {
-  0% { color: #000000; }
-  50% { color: white; }
-  100% { color: #000000; }
-}
-
-.platform-flash {
-  animation: flashPlatform 2s infinite;
-}
 </style>
 </head>
 
@@ -177,7 +166,9 @@
       <span id="footer-time-value"></span>
     </div>
   </footer>
+
 <script>
+  
 const container = document.getElementById('departures-container');
 const footerMessage = document.getElementById('footer-message');
 const footerTimeValue = document.getElementById('footer-time-value');
@@ -185,44 +176,27 @@ const headerTitle = document.getElementById('header-title');
 
 let currentStationCode = 'CAR';
 let services = [];
-let animatedServices = new Set();
 let previousServices = [];
-let previousServicesMap = {};
 let visibleServices = [];
 let expiredServices = new Set();
-let etdHistory = {};
-let etdCheckHistory = {}; // <-- Track last 5 ETDs for each service
-const rows = Array.from(container.getElementsByClassName('departure-row'));
+let etdHistory = {};       // already exists
+let etdCheckHistory = {};  // <--- Add this line here
+
+
 function isTime(value) {
+  // ✅ New helper to detect time strings like "14:37"
   return /^\d{2}:\d{2}$/.test(value);
 }
 
-function createServiceRow(service) {
-  const row = document.createElement('div');
-  row.classList.add('departure-row');
-  fillRow(row, service);
-  return row;
-}
-
-function mapServices(services) {
-  const map = {};
-  services.forEach(s => {
-    const id = `${s.std}-${s.destination?.[0]?.locationName}`;
-    map[id] = {
-      etd: s.etd,
-      platform: s.platform,
-      delayReason: s.delayReason,
-      cancelReason: s.cancelReason
-    };
-  });
-  return map;
-}
-
 function timeToDate(timeStr) {
+  // Converts a "HH:MM" time string to a Date object for today
   const now = new Date();
   const [hours, minutes] = timeStr.split(':').map(Number);
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+  return d;
 }
+
+
 
 function updateFooterTime() {
   const now = new Date();
@@ -236,7 +210,9 @@ function updateFooterDate() {
   const weekday = now.toLocaleDateString('en-GB', { weekday: 'long' });
   const day = now.getDate();
   const month = now.toLocaleDateString('en-GB', { month: 'long' });
+  const year = now.getFullYear();
 
+  // Function to get ordinal suffix
   function getOrdinal(n) {
     if (n >= 11 && n <= 13) return n + 'th';
     switch (n % 10) {
@@ -249,19 +225,8 @@ function updateFooterDate() {
 
   footerMessage.textContent = `${weekday} ${getOrdinal(day)} ${month}`;
 }
+
 updateFooterDate();
-
-let flashStartTime = Date.now(); // global flash sync timestamp
-
-function applyFlashing(element) {
-  if (!element) return;
-
-  element.classList.add('platform-flash');
-
-  // Sync all flashing elements to the same animation start
-  const elapsed = (Date.now() - flashStartTime) / 1000; // seconds
-  element.style.animationDelay = `-${elapsed}s`;
-}
 
 function fillRow(row, service) {
   row.innerHTML = '';
@@ -308,74 +273,33 @@ function fillRow(row, service) {
   platform.textContent = service.platform || '';
   row.appendChild(platform);
 
-  const expected = document.createElement('div');
-  expected.classList.add('expected');
+const expected = document.createElement('div');
+expected.classList.add('expected');
 
-  // If etd equals std, treat as 'On time'
-  let etdText = service.etd;
-  if (service.etd === service.std) etdText = 'On time';
+// Check if ETD is a time
+if (/^\d{2}:\d{2}$/.test(service.etd)) {
+  expected.textContent = `Exp ${service.etd}`;
+} else {
+  expected.textContent = service.etd || 'On time';
+}
 
-  if (/^\d{2}:\d{2}$/.test(etdText)) {
-    expected.textContent = `Exp ${etdText}`;
-  } else {
-    expected.textContent = etdText || 'On time';
-  }
 
-  if (etdText === 'Cancelled') {
-    expected.style.animation = 'fade 2s infinite';
-    expected.style.color = '#00bfff';
-    expected.style.fontFamily = 'Open Sans Bold';
-  } else if (etdText && etdText !== 'On time') {
-    expected.style.color = '#00bfff';
-    expected.style.fontFamily = 'Open Sans Bold';
-  } else {
-    expected.style.color = 'white';
-    expected.style.animation = 'none';
-    expected.style.fontFamily = 'Open Sans';
-  }
+if (service.etd === 'Cancelled') {
+  expected.style.animation = 'fade 2s infinite';
+  expected.style.color = '#00bfff';
+  expected.style.fontFamily = 'Open Sans Bold'; // ✅ use bold font file
+} else if (service.etd && service.etd !== 'On time') {
+  expected.style.color = '#00bfff';
+  expected.style.fontFamily = 'Open Sans Bold'; // ✅ use bold font file
+} else {
+  expected.style.color = 'white';
+  expected.style.animation = 'none';
+  expected.style.fontFamily = 'Open Sans'; // ✅ revert to normal font
+}
+
 
   row.appendChild(expected);
 }
-
-function updateServiceRow(row, newService) {
-  const id = `${newService.std}-${newService.destination?.[0]?.locationName}`;
-  const prev = previousServicesMap[id];
-  if (!prev) return;
-
-  // Normalize ETD
-  const prevETD = (prev.etd === prev.std) ? 'On time' : prev.etd;
-  const newETD = (newService.etd === newService.std) ? 'On time' : newService.etd;
-
-  const platformChanged = prev.platform !== newService.platform;
-  const changed = platformChanged || prevETD !== newETD || prev.delayReason !== newService.delayReason || prev.cancelReason !== newService.cancelReason;
-
-  if (!changed) return;
-
-  // Slide out current row
-  row.classList.add('slide-out');
-
-  setTimeout(() => {
-    // Update row content
-    fillRow(row, newService);
-
-    // Make platform flash if changed or already flashing
-    const platformDiv = row.querySelector('.platform');
-    if (platformChanged || platformDiv.classList.contains('platform-flash')) {
-      platformDiv.classList.add('platform-flash');
-      applyFlashing(platformDiv);
-    }
-
-    // Slide row back in
-    row.classList.remove('slide-out');
-    row.classList.add('slide-in');
-    setTimeout(() => row.classList.remove('slide-in'), 500);
-
-  }, 500);
-}
-
-
-
-
 
 
 function renderRows() {
@@ -383,26 +307,20 @@ function renderRows() {
   visibleServices = [];
 
   const pageHeight = window.innerHeight;
-  const seenIds = new Set();
+  const seen = new Set();
 
-  // Sort services by STD before rendering
-  const sortedServices = services
-    .filter(s => !expiredServices.has(`${s.std}-${s.destination?.[0]?.locationName}`))
-    .sort((a, b) => {
-      const [h1, m1] = a.std.split(':').map(Number);
-      const [h2, m2] = b.std.split(':').map(Number);
-      return (h1 * 60 + m1) - (h2 * 60 + m2);
-    });
-
-  for (let service of sortedServices) {
+  for (let service of services) {
     const id = `${service.std}-${service.destination?.[0]?.locationName}`;
-    if (seenIds.has(id)) continue;
-    seenIds.add(id);
+    if (expiredServices.has(id) || seen.has(id)) continue; // prevent duplicates
+    seen.add(id);
 
-    const row = createServiceRow(service);
+    const row = document.createElement('div');
+    row.classList.add('departure-row');
+    fillRow(row, service);
     container.appendChild(row);
 
-    if (row.getBoundingClientRect().bottom > pageHeight - 75) {
+    const rowBottom = row.getBoundingClientRect().bottom;
+    if (rowBottom > pageHeight - 75) {
       container.removeChild(row);
       break;
     }
@@ -410,116 +328,6 @@ function renderRows() {
     visibleServices.push(service);
   }
 }
-
-async function addNextAvailableService() {
-  try {
-    const res = await fetch(`https://huxley2.azurewebsites.net/departures/${currentStationCode}`);
-    const data = await res.json();
-    const newServices = data.trainServices || [];
-
-    const seenIds = new Set(visibleServices.map(s => `${s.std}-${s.destination?.[0]?.locationName}`));
-    const availableServices = newServices.filter(s => {
-      const id = `${s.std}-${s.destination?.[0]?.locationName}`;
-      return !seenIds.has(id) && !expiredServices.has(id);
-    });
-
-    if (availableServices.length === 0) return;
-
-    const pageHeight = window.innerHeight;
-
-    for (let service of availableServices) {
-      const testRow = createServiceRow(service);
-      testRow.style.visibility = 'hidden';
-      container.appendChild(testRow);
-
-      const fits = testRow.getBoundingClientRect().bottom < pageHeight - 75;
-      container.removeChild(testRow);
-      testRow.style.visibility = '';
-
-      if (!fits) break;
-
-      const newRow = createServiceRow(service);
-      newRow.classList.add('slide-in');
-      container.appendChild(newRow);
-      visibleServices.push(service);
-      seenIds.add(`${service.std}-${service.destination?.[0]?.locationName}`);
-      setTimeout(() => newRow.classList.remove('slide-in'), 600);
-    }
-  } catch (err) {
-    console.error('Error fetching additional service:', err);
-  }
-}
-
-
-function expireService(id, index) {
-  const row = container.children[index];
-  if (!row) return;
-
-  row.dataset.expiring = "true";
-  expiredServices.add(id);
-
-  const insertionIndex = [...container.children].indexOf(row);
-
-  row.classList.add('slide-out');
-
-  setTimeout(() => {
-    let rowHeight = row.offsetHeight;
-
-    if (row.parentNode) {
-      container.removeChild(row);
-    }
-
-    if (!rowHeight || rowHeight < 20) rowHeight = 75;
-
-    const placeholder = document.createElement('div');
-    placeholder.style.height = `${rowHeight}px`;
-    placeholder.style.transition = 'height 0.5s ease';
-    placeholder.style.background = 'transparent';
-
-    container.insertBefore(
-      placeholder,
-      container.children[insertionIndex] || null
-    );
-
-    setTimeout(() => {
-      placeholder.style.height = '0px';
-      setTimeout(() => {
-        if (placeholder.parentNode) container.removeChild(placeholder);
-        setTimeout(addNextAvailableService, 500);
-      }, 500);
-    }, 50);
-  }, 600);
-}
-
-function checkExpiredServices() {
-  const now = new Date();
-  visibleServices.forEach((service, index) => {
-    const id = `${service.std}-${service.destination?.[0]?.locationName}`;
-    if (!etdCheckHistory[id]) etdCheckHistory[id] = [];
-    etdCheckHistory[id].push(service.etd);
-    if (etdCheckHistory[id].length > 10) etdCheckHistory[id].shift(); // track last 10 API calls
-
-    const stdDate = timeToDate(service.std);
-    const etdDate = isTime(service.etd) ? timeToDate(service.etd) : null;
-
-    const last10Same = etdCheckHistory[id].length === 10 && etdCheckHistory[id].every(e => e === etdCheckHistory[id][0]);
-
-    // Case 1: ETD is 'On time'
-    if (last10Same && etdCheckHistory[id][0] === 'On time' && now - stdDate > 30000 && !expiredServices.has(id)) {
-      expireService(id, index);
-    }
-
-    // Case 2: ETD is 'Delayed' or 'Cancelled' (do nothing here)
-    // Case 3: ETD is something else (not 'On time', 'Delayed' or 'Cancelled')
-    const etdText = etdCheckHistory[id][0];
-    if (last10Same && etdText !== 'On time' && etdText !== 'Delayed' && etdText !== 'Cancelled' && etdDate && now - etdDate > 30000 && !expiredServices.has(id)) {
-      expireService(id, index);
-    }
-  });
-}
-
-
-setInterval(checkExpiredServices, 1000);
 
 function fetchDepartures() {
   fetch(`https://huxley2.azurewebsites.net/departures/${currentStationCode}`)
@@ -529,7 +337,14 @@ function fetchDepartures() {
       const stationName = data.locationName || currentStationCode;
       headerTitle.textContent = `${stationName} Departures`;
 
-      // Remove duplicates by STD + destination
+      // Sort by time
+      newServices.sort((a,b)=>{
+        const [h1,m1] = a.std.split(':').map(Number);
+        const [h2,m2] = b.std.split(':').map(Number);
+        return (h1*60+m1) - (h2*60+m2);
+      });
+
+      // Remove duplicates
       const seen = new Set();
       newServices = newServices.filter(s => {
         const id = `${s.std}-${s.destination?.[0]?.locationName}`;
@@ -538,29 +353,196 @@ function fetchDepartures() {
         return true;
       });
 
-      // Sort by STD
-      newServices.sort((a, b) => {
-        const [h1, m1] = a.std.split(':').map(Number);
-        const [h2, m2] = b.std.split(':').map(Number);
-        return (h1 * 60 + m1) - (h2 * 60 + m2);
+      // If no previous data, just render
+      if (previousServices.length === 0) {
+        services = newServices;
+        previousServices = JSON.parse(JSON.stringify(newServices));
+        renderRows();
+        return;
+      }
+
+      const rows = Array.from(container.getElementsByClassName('departure-row'));
+
+      // Handle updated services
+      newServices.forEach((service, i) => {
+        const oldService = previousServices.find(s =>
+          s.std === service.std && s.destination?.[0]?.locationName === service.destination?.[0]?.locationName
+        );
+
+        if (oldService) {
+          const etdChanged = service.etd !== oldService.etd;
+          const cancelChanged = service.cancelReason !== oldService.cancelReason;
+          const delayChanged = service.delayReason !== oldService.delayReason;
+
+          if (etdChanged || cancelChanged || delayChanged) {
+            const row = rows[i];
+            if (row) {
+              row.classList.add('slide-out');
+              setTimeout(() => {
+                fillRow(row, service);
+                row.classList.remove('slide-out');
+                row.classList.add('slide-in');
+                setTimeout(() => row.classList.remove('slide-in'), 600);
+              }, 600);
+            }
+          }
+        }
       });
 
-      // Map previous services for updates
-      previousServicesMap = mapServices(previousServices);
 
-      // Update existing visible rows individually
-      visibleServices.forEach((service, index) => {
-        const row = container.children[index];
-        if (!row) return;
-        const id = `${service.std}-${service.destination?.[0]?.locationName}`;
-        const updatedService = newServices.find(s => `${s.std}-${s.destination?.[0]?.locationName}` === id);
-        if (updatedService) updateServiceRow(row, updatedService);
-      });
+// Handle removed services
+const currentIds = newServices.map(s => `${s.std}-${s.destination?.[0]?.locationName}`);
+rows.forEach((row, index) => {
+  const rowId = `${services[index]?.std}-${services[index]?.destination?.[0]?.locationName}`;
+  if (!currentIds.includes(rowId)) {
+    // Slide out the row
+    row.classList.add('slide-out');
+
+    // After slide-out animation, remove the row and add placeholder
+    setTimeout(() => {
+      const rowHeight = row.offsetHeight;
+
+      // Remove the row
+      if (row.parentNode) container.removeChild(row);
+
+      // Create a placeholder div with the same height
+      const placeholder = document.createElement('div');
+      placeholder.style.height = `${rowHeight}px`;
+      placeholder.style.transition = 'height 0.5s ease';
+      placeholder.style.background = 'transparent'; // invisible but occupies space
+
+      // Insert placeholder where the row was
+      container.insertBefore(placeholder, container.children[index]);
+
+      // Animate placeholder height to 0
+      setTimeout(() => {
+        placeholder.style.height = '0px';
+
+        // Remove placeholder after animation
+        setTimeout(() => {
+          if (placeholder.parentNode) container.removeChild(placeholder);
+
+          // 1 second after placeholder animation ends, check API and add next service if space
+          setTimeout(addNextAvailableService, 10);
+
+        }, 500); // match placeholder transition duration
+      }, 50); // small delay to allow browser to render placeholder
+    }, 500); // wait for slide-out duration
+  }
+});
+
+function checkExpiredServices() {
+  const now = new Date();
+
+  visibleServices.forEach((service, index) => {
+    const id = `${service.std}-${service.destination?.[0]?.locationName}`;
+
+    // Initialize history
+    if (!etdCheckHistory[id]) etdCheckHistory[id] = [];
+
+    // Record current ETD
+    etdCheckHistory[id].push(service.etd);
+    if (etdCheckHistory[id].length > 5) etdCheckHistory[id].shift();
+
+    const stdDate = timeToDate(service.std);
+    const etdDate = isTime(service.etd) ? timeToDate(service.etd) : null;
+
+    // 1️⃣ On time auto-expiry
+    const allOnTime = etdCheckHistory[id].length === 5 && etdCheckHistory[id].every(e => e === 'On time');
+    if (allOnTime && now - stdDate > 15000 && !expiredServices.has(id)) {
+      expireService(id, index);
+    }
+
+    // 2️⃣ ETD number auto-expiry
+    const allSameETD = etdCheckHistory[id].length === 5 && etdCheckHistory[id].every(e => e === etdCheckHistory[id][0] && e !== 'On time');
+    if (allSameETD && etdDate && now - etdDate > 15000 && !expiredServices.has(id)) {
+      expireService(id, index);
+    }
+  });
+}
+
+function expireService(id, index) {
+  const row = container.children[index];
+  if (!row) return;
+  expiredServices.add(id);
+
+  row.classList.add('slide-out');
+  setTimeout(() => {
+    if (row.parentNode) container.removeChild(row);
+    // Wait 2s, then try to add a new service if it fits
+    setTimeout(addNextAvailableService, 500);
+  }, 600);
+}
+
+// Call checkExpiredServices every second
+setInterval(checkExpiredServices, 1000);
+
+// Helper function: fetch new services and add as many as fit on screen
+async function addNextAvailableService() {
+  try {
+    const res = await fetch(`https://huxley2.azurewebsites.net/departures/${currentStationCode}`);
+    const data = await res.json();
+    const newServices = data.trainServices || [];
+
+    // Filter out already visible or expired services
+    const seenIds = new Set(visibleServices.map(s => `${s.std}-${s.destination?.[0]?.locationName}`));
+    const availableServices = newServices.filter(s => {
+      const id = `${s.std}-${s.destination?.[0]?.locationName}`;
+      return !seenIds.has(id) && !expiredServices.has(id);
+    });
+
+    if (availableServices.length === 0) return;
+
+    const pageHeight = window.innerHeight;
+    let lastRow = container.lastElementChild;
+    let lastRowBottom = lastRow ? lastRow.getBoundingClientRect().bottom : 0;
+
+    // Keep adding rows until we run out of space or services
+    for (let i = 0; i < availableServices.length; i++) {
+      const service = availableServices[i];
+      const testRow = createServiceRow(service);
+      testRow.style.visibility = 'hidden';
+      container.appendChild(testRow);
+
+      const testBottom = testRow.getBoundingClientRect().bottom;
+      const fits = testBottom < (pageHeight - 75);
+
+      // Remove test row
+      container.removeChild(testRow);
+      testRow.style.visibility = '';
+
+      if (!fits) break; // stop adding if this one would overflow
+
+      // If it fits, actually add it with animation
+      const newRow = createServiceRow(service);
+      newRow.classList.add('slide-in');
+      container.appendChild(newRow);
+      visibleServices.push(service);
+
+      setTimeout(() => newRow.classList.remove('slide-in'), 600);
+
+      // Update lastRowBottom for next iteration
+      lastRow = newRow;
+      lastRowBottom = lastRow.getBoundingClientRect().bottom;
+    }
+  } catch (err) {
+    console.error('Error fetching additional service:', err);
+  }
+}
+
+
+// Helper to create a row element (used in addNextAvailableService)
+function createServiceRow(service) {
+  const row = document.createElement('div');
+  row.classList.add('departure-row');
+  fillRow(row, service);
+  return row;
+}
+
+
 
       services = newServices;
       previousServices = JSON.parse(JSON.stringify(newServices));
-
-      renderRows();
     })
     .catch(err => {
       console.error(err);
@@ -576,16 +558,17 @@ headerTitle.addEventListener('click', async () => {
   const code = prompt('Enter a station code (e.g., EUS, LST, GTW):', currentStationCode);
   if (code) {
     currentStationCode = code.toUpperCase();
-    expiredServices.clear();
-    previousServices = [];
-    services = [];
-    container.innerHTML = '';
+    expiredServices.clear();        // clear expired services
+    previousServices = [];          // reset previous services
+    services = [];                  // reset current services
+    container.innerHTML = '';       // clear displayed rows
+
+    // Fetch departures for the new station
     await fetchDepartures();
   }
 });
+
+
 </script>
-
-
-
 </body>
 </html>
