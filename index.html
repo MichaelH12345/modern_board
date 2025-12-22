@@ -13,7 +13,6 @@
     font-family: 'Open Sans';
     src: url('https://raw.githubusercontent.com/MichaelH12345/simple-departure-board/main/Open%20Sans%20Regular.ttf') format('truetype');
   }
- 
   body {
     margin: 0;
     background-color: black;
@@ -40,7 +39,6 @@
 .destination { flex: 1; margin-left: 50px; }
 .platform-header { width: 150px; position: absolute; right: 275px; text-align: right; }
 .status { width: 150px; position: absolute; right: 15px; text-align: right; }
-
   .departure-row {
     display: flex;
     align-items: flex-start;
@@ -66,13 +64,11 @@
   .secondary-info { font-size: 3rem; }
   .platform { position: absolute; right: 275px; }
   .expected { position: absolute; right: 15px; }
-
   .placeholder {
     height: 0;
     overflow: hidden;
     transition: height 0.5s ease-in-out;
   }
-
   footer {
     position: fixed;
     bottom: 0;
@@ -96,7 +92,6 @@
   #footer-page { font-size: 3rem; }
   #footer-time { font-size: 3.5rem; font-family: 'Open Sans Bold'; }
   #footer-time .label { font-size: 60%; font-family: 'Open Sans'; }
-
   @keyframes fade {
     0% { opacity: 0; }
     50% { opacity: 1; }
@@ -123,7 +118,6 @@
       <span id="footer-time-value"></span>
     </div>
   </footer>
-
 <script>
 const container = document.getElementById('departures-container');
 const footerMessage = document.getElementById('footer-message');
@@ -131,9 +125,11 @@ const footerTimeValue = document.getElementById('footer-time-value');
 const headerTitle = document.getElementById('header-title');
 
 let currentStationCode = 'CAR';
-let services = [];              // All current services from API, sorted by STD
-let previousServices = [];      // For detecting changes
-let visibleServices = [];       // Currently displayed services
+let services = [];
+let previousServices = [];
+let visibleServices = [];
+
+const previousPlatform = new Map(); // key: serviceId, value: old platform
 
 function getServiceId(service) {
   return `${service.std}-${service.destination?.[0]?.locationName || ''}`;
@@ -168,7 +164,7 @@ function updateFooterDate() {
 }
 updateFooterDate();
 
-function fillRow(row, service) {
+function fillRow(row, service, isPlatformChanged = false) {
   row.innerHTML = '';
   const time = document.createElement('div');
   time.textContent = service.std || '';
@@ -210,6 +206,18 @@ function fillRow(row, service) {
   const platform = document.createElement('div');
   platform.classList.add('platform');
   platform.textContent = service.platform || '';
+
+  // Platform change: flash (fade animation) + bold, but keep color WHITE
+  if (isPlatformChanged && service.platform) {
+    platform.style.animation = 'fade 1s infinite';
+    platform.style.color = 'white';           // ← Keep white
+    platform.style.fontFamily = 'Open Sans Bold';
+  } else {
+    platform.style.animation = 'none';
+    platform.style.color = 'white';
+    platform.style.fontFamily = 'Open Sans';
+  }
+
   row.appendChild(platform);
 
   const expected = document.createElement('div');
@@ -236,18 +244,16 @@ function fillRow(row, service) {
   row.appendChild(expected);
 }
 
-function createRow(service) {
+function createRow(service, isPlatformChanged = false) {
   const row = document.createElement('div');
   row.classList.add('departure-row');
   row.dataset.id = getServiceId(service);
-  fillRow(row, service);
+  fillRow(row, service, isPlatformChanged);
   return row;
 }
 
-// Add as many new services as fit on screen
 async function addNextAvailableService() {
   const pageHeight = window.innerHeight - 90;
-  let bottom = container.lastElementChild ? container.lastElementChild.getBoundingClientRect().bottom : 0;
 
   for (const service of services) {
     const id = getServiceId(service);
@@ -272,19 +278,14 @@ async function addNextAvailableService() {
 function removeRowWithStretch(row, index) {
   const height = row.offsetHeight;
   row.classList.add('slide-out');
-
   setTimeout(() => {
     if (row.parentNode) container.removeChild(row);
-
     const placeholder = document.createElement('div');
     placeholder.classList.add('placeholder');
     placeholder.style.height = `${height}px`;
-
     container.insertBefore(placeholder, container.children[index]);
-
     void placeholder.offsetHeight;
     placeholder.style.height = '0px';
-
     setTimeout(() => {
       if (placeholder.parentNode) container.removeChild(placeholder);
       addNextAvailableService();
@@ -301,14 +302,12 @@ async function fetchDepartures() {
 
     let newServices = data.trainServices || [];
 
-    // Sort by STD
     newServices.sort((a, b) => {
       const t1 = (a.std || '99:99').split(':').map(Number);
       const t2 = (b.std || '99:99').split(':').map(Number);
       return (t1[0]*60 + t1[1]) - (t2[0]*60 + t2[1]);
     });
 
-    // Remove duplicates
     const seen = new Set();
     newServices = newServices.filter(s => {
       const id = getServiceId(s);
@@ -328,33 +327,45 @@ async function fetchDepartures() {
 
     const currentRows = Array.from(container.querySelectorAll('.departure-row'));
 
-    // Update rows where ETD/cancellation/delay changed
     newServices.forEach((service, i) => {
       const old = previousServices.find(p => getServiceId(p) === getServiceId(service));
       if (old) {
-        const changed = service.etd !== old.etd ||
-                        service.cancelReason !== old.cancelReason ||
-                        service.delayReason !== old.delayReason;
+        const platformChanged = service.platform !== old.platform && service.platform;
+        const statusChanged = service.etd !== old.etd ||
+                              service.cancelReason !== old.cancelReason ||
+                              service.delayReason !== old.delayReason;
 
-        if (changed && currentRows[i]) {
+        if ((statusChanged || platformChanged) && currentRows[i]) {
+          if (platformChanged) {
+            previousPlatform.set(getServiceId(service), service.platform);
+          }
+
           currentRows[i].classList.add('slide-out');
           setTimeout(() => {
-            fillRow(currentRows[i], service);
+            fillRow(currentRows[i], service, platformChanged);
             currentRows[i].classList.remove('slide-out');
             currentRows[i].classList.add('slide-in');
             setTimeout(() => currentRows[i].classList.remove('slide-in'), 600);
           }, 600);
         }
+      } else {
+        previousPlatform.delete(getServiceId(service));
       }
     });
 
-    // Remove services that have disappeared from the API
+    previousServices.forEach(old => {
+      const stillExists = newServices.some(s => getServiceId(s) === getServiceId(old));
+      if (!stillExists) {
+        previousPlatform.delete(getServiceId(old));
+      }
+    });
+
     const newIds = new Set(newServices.map(getServiceId));
     currentRows.forEach((row, index) => {
       const service = visibleServices[index];
       if (service && !newIds.has(getServiceId(service))) {
+        previousPlatform.delete(getServiceId(service));
         removeRowWithStretch(row, index);
-        // Update visibleServices to reflect removal
         visibleServices = visibleServices.filter(s => getServiceId(s) !== getServiceId(service));
       }
     });
@@ -362,7 +373,6 @@ async function fetchDepartures() {
     services = newServices;
     previousServices = structuredClone(newServices);
 
-    // Add any new services if there's space
     setTimeout(addNextAvailableService, 100);
 
   } catch (err) {
@@ -377,6 +387,7 @@ setInterval(fetchDepartures, 10000);
 window.addEventListener('resize', () => {
   container.innerHTML = '';
   visibleServices = [];
+  previousPlatform.clear();
   addNextAvailableService();
 });
 
@@ -387,6 +398,7 @@ headerTitle.addEventListener('click', () => {
     services = [];
     previousServices = [];
     visibleServices = [];
+    previousPlatform.clear();
     container.innerHTML = '';
     fetchDepartures();
   }
