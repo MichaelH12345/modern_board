@@ -35,10 +35,10 @@
     align-items: center;
     font-size: 2.5rem;
   }
-.time { width: 100px; }
-.destination { flex: 1; margin-left: 50px; }
-.platform-header { width: 150px; position: absolute; right: 275px; text-align: right; }
-.status { width: 150px; position: absolute; right: 15px; text-align: right; }
+  .time { width: 100px; }
+  .destination { flex: 1; margin-left: 50px; }
+  .platform-header { width: 150px; position: absolute; right: 275px; text-align: right; }
+  .status { width: 150px; position: absolute; right: 15px; text-align: right; }
   .departure-row {
     display: flex;
     align-items: flex-start;
@@ -47,14 +47,14 @@
     padding: 5px 15px;
     position: relative;
     line-height: 1.3;
-    transition: transform 0.5s ease-in-out;
+    transition: transform 0.625s ease-in-out;
   }
   .slide-out {
     transform: translateX(100%);
   }
   .slide-in {
     transform: translateX(-100%);
-    animation: slideIn 0.5s forwards ease-in-out;
+    animation: slideIn 0.625s forwards ease-in-out;
   }
   @keyframes slideIn {
     from { transform: translateX(-100%); }
@@ -67,7 +67,7 @@
   .placeholder {
     height: 0;
     overflow: hidden;
-    transition: height 0.5s ease-in-out;
+    transition: height 0.625s ease-in-out;
   }
   footer {
     position: fixed;
@@ -92,10 +92,15 @@
   #footer-page { font-size: 3rem; }
   #footer-time { font-size: 3.5rem; font-family: 'Open Sans Bold'; }
   #footer-time .label { font-size: 60%; font-family: 'Open Sans'; }
+
   @keyframes fade {
     0% { opacity: 0; }
     50% { opacity: 1; }
     100% { opacity: 0; }
+  }
+
+  .flash {
+    animation: fade 1.25s infinite ease-in-out;
   }
 </style>
 </head>
@@ -118,6 +123,7 @@
       <span id="footer-time-value"></span>
     </div>
   </footer>
+
 <script>
 const container = document.getElementById('departures-container');
 const footerMessage = document.getElementById('footer-message');
@@ -125,14 +131,20 @@ const footerTimeValue = document.getElementById('footer-time-value');
 const headerTitle = document.getElementById('header-title');
 
 let currentStationCode = 'CAR';
-let services = [];
-let previousServices = [];
-let visibleServices = [];
+let services = [];           // Full sorted list of current services (unique by ID)
+let previousServices = [];   // Previous full list (for detecting changes)
+let visibleServices = [];    // Services currently visible (subset of services, in order)
 
-const previousPlatform = new Map(); // key: serviceId, value: old platform
+const previousPlatform = new Map(); // Tracks last known platform for change detection
 
 function getServiceId(service) {
   return `${service.std}-${service.destination?.[0]?.locationName || ''}`;
+}
+
+function parseTime(std) {
+  if (!std) return Infinity;
+  const [h, m] = std.split(':').map(Number);
+  return h * 60 + m;
 }
 
 function isTime(value) {
@@ -141,7 +153,7 @@ function isTime(value) {
 
 function updateFooterTime() {
   const now = new Date();
-  footerTimeValue.textContent = now.toLocaleTimeString('en-GB', { hour12: false });
+  footerTimeValue.textContent = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 }
 setInterval(updateFooterTime, 1000);
 updateFooterTime();
@@ -166,6 +178,7 @@ updateFooterDate();
 
 function fillRow(row, service, isPlatformChanged = false) {
   row.innerHTML = '';
+
   const time = document.createElement('div');
   time.textContent = service.std || '';
   row.appendChild(time);
@@ -207,37 +220,31 @@ function fillRow(row, service, isPlatformChanged = false) {
   platform.classList.add('platform');
   platform.textContent = service.platform || '';
 
-  // Platform change: flash (fade animation) + bold, but keep color WHITE
   if (isPlatformChanged && service.platform) {
-    platform.style.animation = 'fade 1s infinite';
-    platform.style.color = 'white';           // ← Keep white
+    platform.classList.add('flash');
     platform.style.fontFamily = 'Open Sans Bold';
   } else {
-    platform.style.animation = 'none';
-    platform.style.color = 'white';
+    platform.classList.remove('flash');
     platform.style.fontFamily = 'Open Sans';
   }
-
+  platform.style.color = 'white';
   row.appendChild(platform);
 
   const expected = document.createElement('div');
   expected.classList.add('expected');
-  if (isTime(service.etd)) {
-    expected.textContent = `Exp ${service.etd}`;
-  } else {
-    expected.textContent = service.etd || 'On time';
-  }
+  expected.textContent = isTime(service.etd) ? `Exp ${service.etd}` : (service.etd || 'On time');
 
   if (service.etd === 'Cancelled') {
-    expected.style.animation = 'fade 2s infinite';
+    expected.classList.add('flash');
     expected.style.color = '#00bfff';
     expected.style.fontFamily = 'Open Sans Bold';
   } else if (service.etd && service.etd !== 'On time') {
+    expected.classList.remove('flash');
     expected.style.color = '#00bfff';
     expected.style.fontFamily = 'Open Sans Bold';
   } else {
+    expected.classList.remove('flash');
     expected.style.color = 'white';
-    expected.style.animation = 'none';
     expected.style.fontFamily = 'Open Sans';
   }
 
@@ -252,45 +259,35 @@ function createRow(service, isPlatformChanged = false) {
   return row;
 }
 
-async function addNextAvailableService() {
-  const pageHeight = window.innerHeight - 90;
+// Rebuild visible rows from scratch, ensuring correct order and no duplicates
+function rebuildVisibleRows() {
+  container.innerHTML = '';
+  visibleServices = [];
+
+  const headerHeight = document.querySelector('header').offsetHeight;
+  const footerHeight = document.querySelector('footer').offsetHeight;
+  const availableHeight = window.innerHeight - headerHeight - footerHeight - 20;
 
   for (const service of services) {
-    const id = getServiceId(service);
-    if (visibleServices.some(s => getServiceId(s) === id)) continue;
-
     const testRow = createRow(service);
     testRow.style.visibility = 'hidden';
+    testRow.style.position = 'absolute';
     container.appendChild(testRow);
-    const fits = testRow.getBoundingClientRect().bottom < pageHeight;
-    container.removeChild(testRow);
 
-    if (!fits) break;
+    if (testRow.getBoundingClientRect().bottom - container.getBoundingClientRect().top > availableHeight) {
+      container.removeChild(testRow);
+      break;
+    }
+
+    container.removeChild(testRow);
 
     const newRow = createRow(service);
     newRow.classList.add('slide-in');
     container.appendChild(newRow);
     visibleServices.push(service);
-    setTimeout(() => newRow.classList.remove('slide-in'), 600);
-  }
-}
 
-function removeRowWithStretch(row, index) {
-  const height = row.offsetHeight;
-  row.classList.add('slide-out');
-  setTimeout(() => {
-    if (row.parentNode) container.removeChild(row);
-    const placeholder = document.createElement('div');
-    placeholder.classList.add('placeholder');
-    placeholder.style.height = `${height}px`;
-    container.insertBefore(placeholder, container.children[index]);
-    void placeholder.offsetHeight;
-    placeholder.style.height = '0px';
-    setTimeout(() => {
-      if (placeholder.parentNode) container.removeChild(placeholder);
-      addNextAvailableService();
-    }, 500);
-  }, 600);
+    setTimeout(() => newRow.classList.remove('slide-in'), 700);
+  }
 }
 
 async function fetchDepartures() {
@@ -302,12 +299,10 @@ async function fetchDepartures() {
 
     let newServices = data.trainServices || [];
 
-    newServices.sort((a, b) => {
-      const t1 = (a.std || '99:99').split(':').map(Number);
-      const t2 = (b.std || '99:99').split(':').map(Number);
-      return (t1[0]*60 + t1[1]) - (t2[0]*60 + t2[1]);
-    });
+    // Sort by scheduled time (std)
+    newServices.sort((a, b) => parseTime(a.std) - parseTime(b.std));
 
+    // Remove exact duplicates using service ID
     const seen = new Set();
     newServices = newServices.filter(s => {
       const id = getServiceId(s);
@@ -319,61 +314,109 @@ async function fetchDepartures() {
     if (previousServices.length === 0) {
       services = newServices;
       previousServices = structuredClone(newServices);
-      visibleServices = [];
-      container.innerHTML = '';
-      addNextAvailableService();
+      rebuildVisibleRows();
       return;
     }
 
-    const currentRows = Array.from(container.querySelectorAll('.departure-row'));
-
-    newServices.forEach((service, i) => {
+    // Detect platform changes
+    const platformChangedIds = new Set();
+    newServices.forEach(service => {
       const old = previousServices.find(p => getServiceId(p) === getServiceId(service));
-      if (old) {
-        const platformChanged = service.platform !== old.platform && service.platform;
-        const statusChanged = service.etd !== old.etd ||
-                              service.cancelReason !== old.cancelReason ||
-                              service.delayReason !== old.delayReason;
+      if (old && old.platform !== service.platform && service.platform) {
+        platformChangedIds.add(getServiceId(service));
+      }
+    });
 
-        if ((statusChanged || platformChanged) && currentRows[i]) {
-          if (platformChanged) {
-            previousPlatform.set(getServiceId(service), service.platform);
-          }
+    // Update existing rows if needed (status or platform changed)
+    const currentRows = Array.from(container.querySelectorAll('.departure-row'));
+    newServices.forEach((service, i) => {
+      if (i >= currentRows.length) return;
+      const old = previousServices.find(p => getServiceId(p) === getServiceId(service));
+      if (!old) return;
 
-          currentRows[i].classList.add('slide-out');
-          setTimeout(() => {
-            fillRow(currentRows[i], service, platformChanged);
-            currentRows[i].classList.remove('slide-out');
-            currentRows[i].classList.add('slide-in');
-            setTimeout(() => currentRows[i].classList.remove('slide-in'), 600);
-          }, 600);
-        }
+      const statusChanged = service.etd !== old.etd ||
+                            service.cancelReason !== old.cancelReason ||
+                            service.delayReason !== old.delayReason;
+
+      const platformChanged = platformChangedIds.has(getServiceId(service));
+
+      if (statusChanged || platformChanged) {
+        currentRows[i].classList.add('slide-out');
+        setTimeout(() => {
+          fillRow(currentRows[i], service, platformChanged);
+          currentRows[i].classList.remove('slide-out');
+          currentRows[i].classList.add('slide-in');
+          setTimeout(() => currentRows[i].classList.remove('slide-in'), 700);
+        }, 700);
       } else {
-        previousPlatform.delete(getServiceId(service));
+        // Quiet refresh to maintain flash state
+        fillRow(currentRows[i], service, platformChanged);
       }
     });
 
-    previousServices.forEach(old => {
-      const stillExists = newServices.some(s => getServiceId(s) === getServiceId(old));
-      if (!stillExists) {
-        previousPlatform.delete(getServiceId(old));
-      }
-    });
-
+    // Remove departed services (with animation)
     const newIds = new Set(newServices.map(getServiceId));
+    const rowsToRemove = [];
     currentRows.forEach((row, index) => {
       const service = visibleServices[index];
       if (service && !newIds.has(getServiceId(service))) {
-        previousPlatform.delete(getServiceId(service));
-        removeRowWithStretch(row, index);
-        visibleServices = visibleServices.filter(s => getServiceId(s) !== getServiceId(service));
+        rowsToRemove.push({ row, index });
       }
+    });
+
+    rowsToRemove.reverse().forEach(({ row, index }) => {
+      const height = row.offsetHeight;
+      row.classList.add('slide-out');
+      setTimeout(() => {
+        if (row.parentNode) container.removeChild(row);
+        visibleServices.splice(index, 1);
+
+        const placeholder = document.createElement('div');
+        placeholder.classList.add('placeholder');
+        placeholder.style.height = `${height}px`;
+        if (container.children[index]) {
+          container.insertBefore(placeholder, container.children[index]);
+        } else {
+          container.appendChild(placeholder);
+        }
+        void placeholder.offsetHeight;
+        placeholder.style.height = '0px';
+
+        setTimeout(() => {
+          if (placeholder.parentNode) container.removeChild(placeholder);
+        }, 625);
+      }, 700);
     });
 
     services = newServices;
     previousServices = structuredClone(newServices);
 
-    setTimeout(addNextAvailableService, 100);
+    // Add new services that fit
+    setTimeout(() => {
+      const availableHeight = window.innerHeight - document.querySelector('header').offsetHeight - document.querySelector('footer').offsetHeight - 20;
+      let currentBottom = container.getBoundingClientRect().bottom;
+
+      for (const service of services) {
+        const id = getServiceId(service);
+        if (visibleServices.some(s => getServiceId(s) === id)) continue;
+
+        const testRow = createRow(service, platformChangedIds.has(id));
+        testRow.style.visibility = 'hidden';
+        testRow.style.position = 'absolute';
+        container.appendChild(testRow);
+
+        const wouldFit = testRow.getBoundingClientRect().bottom - container.getBoundingClientRect().top <= availableHeight;
+
+        container.removeChild(testRow);
+        if (!wouldFit) break;
+
+        const newRow = createRow(service, platformChangedIds.has(id));
+        newRow.classList.add('slide-in');
+        container.appendChild(newRow);
+        visibleServices.push(service);
+        setTimeout(() => newRow.classList.remove('slide-in'), 700);
+      }
+    }, 800);
 
   } catch (err) {
     console.error(err);
@@ -384,11 +427,9 @@ async function fetchDepartures() {
 fetchDepartures();
 setInterval(fetchDepartures, 10000);
 
+// On resize: fully rebuild in correct order
 window.addEventListener('resize', () => {
-  container.innerHTML = '';
-  visibleServices = [];
-  previousPlatform.clear();
-  addNextAvailableService();
+  rebuildVisibleRows();
 });
 
 headerTitle.addEventListener('click', () => {
