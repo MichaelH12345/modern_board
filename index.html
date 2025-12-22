@@ -1,11 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Departures</title>
-
 <style>
   @font-face {
     font-family: 'Open Sans Bold';
@@ -15,8 +13,7 @@
     font-family: 'Open Sans';
     src: url('https://raw.githubusercontent.com/MichaelH12345/simple-departure-board/main/Open%20Sans%20Regular.ttf') format('truetype');
   }
-  
-
+ 
   body {
     margin: 0;
     background-color: black;
@@ -24,48 +21,25 @@
     font-family: 'Open Sans', sans-serif;
     overflow: hidden;
   }
-
   header {
     background-color: #001f4d;
     border-bottom: 4px solid white;
     padding-left: 15px;
   }
-
   .header-title {
     font-family: 'Open Sans Bold';
     font-size: 4rem;
     margin: 0;
   }
-
   .header-row {
     display: flex;
     align-items: center;
     font-size: 2.5rem;
   }
-
-.time { 
-  width: 100px; 
-}
-
-.destination { 
-  flex: 1; 
-  margin-left: 50px; 
-}
-
-.platform-header { 
-  width: 150px; 
-  position: absolute;
-  right: 275px;
-  text-align: right;
-}
-
-.status { 
-  width: 150px; 
-  position: absolute;
-  right: 15px;
-  text-align: right;
-}
-
+.time { width: 100px; }
+.destination { flex: 1; margin-left: 50px; }
+.platform-header { width: 150px; position: absolute; right: 275px; text-align: right; }
+.status { width: 150px; position: absolute; right: 15px; text-align: right; }
 
   .departure-row {
     display: flex;
@@ -77,29 +51,27 @@
     line-height: 1.3;
     transition: transform 0.6s ease-in-out;
   }
-
   .slide-out {
     transform: translateX(100%);
   }
-
   .slide-in {
     transform: translateX(-100%);
     animation: slideIn 0.6s forwards ease-in-out;
   }
-
   @keyframes slideIn {
     from { transform: translateX(-100%); }
     to { transform: translateX(0); }
   }
-
   .destination-box { flex: 1; margin-left: 25px; }
-
-  .secondary-info {
-    font-size: 3rem;
-  }
-
+  .secondary-info { font-size: 3rem; }
   .platform { position: absolute; right: 275px; }
   .expected { position: absolute; right: 15px; }
+
+  .placeholder {
+    height: 0;
+    overflow: hidden;
+    transition: height 0.5s ease-in-out;
+  }
 
   footer {
     position: fixed;
@@ -114,7 +86,6 @@
     padding: 0 15px;
     box-sizing: border-box;
   }
-
   #footer-message {
     font-size: 2.5rem;
     max-width: 75%;
@@ -122,20 +93,9 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-
-  #footer-page {
-    font-size: 3rem;
-  }
-
-  #footer-time {
-    font-size: 3.5rem;
-    font-family: 'Open Sans Bold';
-  }
-
-  #footer-time .label {
-    font-size: 60%;
-    font-family: 'Open Sans';
-  }
+  #footer-page { font-size: 3rem; }
+  #footer-time { font-size: 3.5rem; font-family: 'Open Sans Bold'; }
+  #footer-time .label { font-size: 60%; font-family: 'Open Sans'; }
 
   @keyframes fade {
     0% { opacity: 0; }
@@ -144,7 +104,6 @@
   }
 </style>
 </head>
-
 <body>
   <header>
     <div class="header-title" id="header-title">Station Departures</div>
@@ -155,9 +114,7 @@
       <div class="status">Status</div>
     </div>
   </header>
-
   <div id="departures-container"></div>
-
   <footer>
     <div id="footer-message"></div>
     <div id="footer-page"></div>
@@ -168,35 +125,23 @@
   </footer>
 
 <script>
-  
 const container = document.getElementById('departures-container');
 const footerMessage = document.getElementById('footer-message');
 const footerTimeValue = document.getElementById('footer-time-value');
 const headerTitle = document.getElementById('header-title');
 
 let currentStationCode = 'CAR';
-let services = [];
-let previousServices = [];
-let visibleServices = [];
-let expiredServices = new Set();
-let etdHistory = {};       // already exists
-let etdCheckHistory = {};  // <--- Add this line here
+let services = [];              // All current services from API, sorted by STD
+let previousServices = [];      // For detecting changes
+let visibleServices = [];       // Currently displayed services
 
+function getServiceId(service) {
+  return `${service.std}-${service.destination?.[0]?.locationName || ''}`;
+}
 
 function isTime(value) {
-  // ✅ New helper to detect time strings like "14:37"
   return /^\d{2}:\d{2}$/.test(value);
 }
-
-function timeToDate(timeStr) {
-  // Converts a "HH:MM" time string to a Date object for today
-  const now = new Date();
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
-  return d;
-}
-
-
 
 function updateFooterTime() {
   const now = new Date();
@@ -210,9 +155,6 @@ function updateFooterDate() {
   const weekday = now.toLocaleDateString('en-GB', { weekday: 'long' });
   const day = now.getDate();
   const month = now.toLocaleDateString('en-GB', { month: 'long' });
-  const year = now.getFullYear();
-
-  // Function to get ordinal suffix
   function getOrdinal(n) {
     if (n >= 11 && n <= 13) return n + 'th';
     switch (n % 10) {
@@ -222,15 +164,12 @@ function updateFooterDate() {
       default: return n + 'th';
     }
   }
-
   footerMessage.textContent = `${weekday} ${getOrdinal(day)} ${month}`;
 }
-
 updateFooterDate();
 
 function fillRow(row, service) {
   row.innerHTML = '';
-
   const time = document.createElement('div');
   time.textContent = service.std || '';
   row.appendChild(time);
@@ -273,302 +212,185 @@ function fillRow(row, service) {
   platform.textContent = service.platform || '';
   row.appendChild(platform);
 
-const expected = document.createElement('div');
-expected.classList.add('expected');
+  const expected = document.createElement('div');
+  expected.classList.add('expected');
+  if (isTime(service.etd)) {
+    expected.textContent = `Exp ${service.etd}`;
+  } else {
+    expected.textContent = service.etd || 'On time';
+  }
 
-// Check if ETD is a time
-if (/^\d{2}:\d{2}$/.test(service.etd)) {
-  expected.textContent = `Exp ${service.etd}`;
-} else {
-  expected.textContent = service.etd || 'On time';
-}
-
-
-if (service.etd === 'Cancelled') {
-  expected.style.animation = 'fade 2s infinite';
-  expected.style.color = '#00bfff';
-  expected.style.fontFamily = 'Open Sans Bold'; // ✅ use bold font file
-} else if (service.etd && service.etd !== 'On time') {
-  expected.style.color = '#00bfff';
-  expected.style.fontFamily = 'Open Sans Bold'; // ✅ use bold font file
-} else {
-  expected.style.color = 'white';
-  expected.style.animation = 'none';
-  expected.style.fontFamily = 'Open Sans'; // ✅ revert to normal font
-}
-
+  if (service.etd === 'Cancelled') {
+    expected.style.animation = 'fade 2s infinite';
+    expected.style.color = '#00bfff';
+    expected.style.fontFamily = 'Open Sans Bold';
+  } else if (service.etd && service.etd !== 'On time') {
+    expected.style.color = '#00bfff';
+    expected.style.fontFamily = 'Open Sans Bold';
+  } else {
+    expected.style.color = 'white';
+    expected.style.animation = 'none';
+    expected.style.fontFamily = 'Open Sans';
+  }
 
   row.appendChild(expected);
 }
 
-
-function renderRows() {
-  container.innerHTML = '';
-  visibleServices = [];
-
-  const pageHeight = window.innerHeight;
-  const seen = new Set();
-
-  for (let service of services) {
-    const id = `${service.std}-${service.destination?.[0]?.locationName}`;
-    if (expiredServices.has(id) || seen.has(id)) continue; // prevent duplicates
-    seen.add(id);
-
-    const row = document.createElement('div');
-    row.classList.add('departure-row');
-    fillRow(row, service);
-    container.appendChild(row);
-
-    const rowBottom = row.getBoundingClientRect().bottom;
-    if (rowBottom > pageHeight - 75) {
-      container.removeChild(row);
-      break;
-    }
-
-    visibleServices.push(service);
-  }
-}
-
-function fetchDepartures() {
-  fetch(`https://huxley2.azurewebsites.net/departures/${currentStationCode}`)
-    .then(res => res.json())
-    .then(data => {
-      let newServices = data.trainServices || [];
-      const stationName = data.locationName || currentStationCode;
-      headerTitle.textContent = `${stationName} Departures`;
-
-      // Sort by time
-      newServices.sort((a,b)=>{
-        const [h1,m1] = a.std.split(':').map(Number);
-        const [h2,m2] = b.std.split(':').map(Number);
-        return (h1*60+m1) - (h2*60+m2);
-      });
-
-      // Remove duplicates
-      const seen = new Set();
-      newServices = newServices.filter(s => {
-        const id = `${s.std}-${s.destination?.[0]?.locationName}`;
-        if (seen.has(id)) return false;
-        seen.add(id);
-        return true;
-      });
-
-      // If no previous data, just render
-      if (previousServices.length === 0) {
-        services = newServices;
-        previousServices = JSON.parse(JSON.stringify(newServices));
-        renderRows();
-        return;
-      }
-
-      const rows = Array.from(container.getElementsByClassName('departure-row'));
-
-      // Handle updated services
-      newServices.forEach((service, i) => {
-        const oldService = previousServices.find(s =>
-          s.std === service.std && s.destination?.[0]?.locationName === service.destination?.[0]?.locationName
-        );
-
-        if (oldService) {
-          const etdChanged = service.etd !== oldService.etd;
-          const cancelChanged = service.cancelReason !== oldService.cancelReason;
-          const delayChanged = service.delayReason !== oldService.delayReason;
-
-          if (etdChanged || cancelChanged || delayChanged) {
-            const row = rows[i];
-            if (row) {
-              row.classList.add('slide-out');
-              setTimeout(() => {
-                fillRow(row, service);
-                row.classList.remove('slide-out');
-                row.classList.add('slide-in');
-                setTimeout(() => row.classList.remove('slide-in'), 600);
-              }, 600);
-            }
-          }
-        }
-      });
-
-
-// Handle removed services
-const currentIds = newServices.map(s => `${s.std}-${s.destination?.[0]?.locationName}`);
-rows.forEach((row, index) => {
-  const rowId = `${services[index]?.std}-${services[index]?.destination?.[0]?.locationName}`;
-  if (!currentIds.includes(rowId)) {
-    // Slide out the row
-    row.classList.add('slide-out');
-
-    // After slide-out animation, remove the row and add placeholder
-    setTimeout(() => {
-      const rowHeight = row.offsetHeight;
-
-      // Remove the row
-      if (row.parentNode) container.removeChild(row);
-
-      // Create a placeholder div with the same height
-      const placeholder = document.createElement('div');
-      placeholder.style.height = `${rowHeight}px`;
-      placeholder.style.transition = 'height 0.5s ease';
-      placeholder.style.background = 'transparent'; // invisible but occupies space
-
-      // Insert placeholder where the row was
-      container.insertBefore(placeholder, container.children[index]);
-
-      // Animate placeholder height to 0
-      setTimeout(() => {
-        placeholder.style.height = '0px';
-
-        // Remove placeholder after animation
-        setTimeout(() => {
-          if (placeholder.parentNode) container.removeChild(placeholder);
-
-          // 1 second after placeholder animation ends, check API and add next service if space
-          setTimeout(addNextAvailableService, 10);
-
-        }, 500); // match placeholder transition duration
-      }, 50); // small delay to allow browser to render placeholder
-    }, 500); // wait for slide-out duration
-  }
-});
-
-function checkExpiredServices() {
-  const now = new Date();
-
-  visibleServices.forEach((service, index) => {
-    const id = `${service.std}-${service.destination?.[0]?.locationName}`;
-
-    // Initialize history
-    if (!etdCheckHistory[id]) etdCheckHistory[id] = [];
-
-    // Record current ETD
-    etdCheckHistory[id].push(service.etd);
-    if (etdCheckHistory[id].length > 5) etdCheckHistory[id].shift();
-
-    const stdDate = timeToDate(service.std);
-    const etdDate = isTime(service.etd) ? timeToDate(service.etd) : null;
-
-    // 1️⃣ On time auto-expiry
-    const allOnTime = etdCheckHistory[id].length === 5 && etdCheckHistory[id].every(e => e === 'On time');
-    if (allOnTime && now - stdDate > 15000 && !expiredServices.has(id)) {
-      expireService(id, index);
-    }
-
-    // 2️⃣ ETD number auto-expiry
-    const allSameETD = etdCheckHistory[id].length === 5 && etdCheckHistory[id].every(e => e === etdCheckHistory[id][0] && e !== 'On time');
-    if (allSameETD && etdDate && now - etdDate > 15000 && !expiredServices.has(id)) {
-      expireService(id, index);
-    }
-  });
-}
-
-function expireService(id, index) {
-  const row = container.children[index];
-  if (!row) return;
-  expiredServices.add(id);
-
-  row.classList.add('slide-out');
-  setTimeout(() => {
-    if (row.parentNode) container.removeChild(row);
-    // Wait 2s, then try to add a new service if it fits
-    setTimeout(addNextAvailableService, 500);
-  }, 600);
-}
-
-// Call checkExpiredServices every second
-setInterval(checkExpiredServices, 1000);
-
-// Helper function: fetch new services and add as many as fit on screen
-async function addNextAvailableService() {
-  try {
-    const res = await fetch(`https://huxley2.azurewebsites.net/departures/${currentStationCode}`);
-    const data = await res.json();
-    const newServices = data.trainServices || [];
-
-    // Filter out already visible or expired services
-    const seenIds = new Set(visibleServices.map(s => `${s.std}-${s.destination?.[0]?.locationName}`));
-    const availableServices = newServices.filter(s => {
-      const id = `${s.std}-${s.destination?.[0]?.locationName}`;
-      return !seenIds.has(id) && !expiredServices.has(id);
-    });
-
-    if (availableServices.length === 0) return;
-
-    const pageHeight = window.innerHeight;
-    let lastRow = container.lastElementChild;
-    let lastRowBottom = lastRow ? lastRow.getBoundingClientRect().bottom : 0;
-
-    // Keep adding rows until we run out of space or services
-    for (let i = 0; i < availableServices.length; i++) {
-      const service = availableServices[i];
-      const testRow = createServiceRow(service);
-      testRow.style.visibility = 'hidden';
-      container.appendChild(testRow);
-
-      const testBottom = testRow.getBoundingClientRect().bottom;
-      const fits = testBottom < (pageHeight - 75);
-
-      // Remove test row
-      container.removeChild(testRow);
-      testRow.style.visibility = '';
-
-      if (!fits) break; // stop adding if this one would overflow
-
-      // If it fits, actually add it with animation
-      const newRow = createServiceRow(service);
-      newRow.classList.add('slide-in');
-      container.appendChild(newRow);
-      visibleServices.push(service);
-
-      setTimeout(() => newRow.classList.remove('slide-in'), 600);
-
-      // Update lastRowBottom for next iteration
-      lastRow = newRow;
-      lastRowBottom = lastRow.getBoundingClientRect().bottom;
-    }
-  } catch (err) {
-    console.error('Error fetching additional service:', err);
-  }
-}
-
-
-// Helper to create a row element (used in addNextAvailableService)
-function createServiceRow(service) {
+function createRow(service) {
   const row = document.createElement('div');
   row.classList.add('departure-row');
+  row.dataset.id = getServiceId(service);
   fillRow(row, service);
   return row;
 }
 
+// Add as many new services as fit on screen
+async function addNextAvailableService() {
+  const pageHeight = window.innerHeight - 175;
+  let bottom = container.lastElementChild ? container.lastElementChild.getBoundingClientRect().bottom : 0;
 
+  for (const service of services) {
+    const id = getServiceId(service);
+    if (visibleServices.some(s => getServiceId(s) === id)) continue;
 
-      services = newServices;
-      previousServices = JSON.parse(JSON.stringify(newServices));
-    })
-    .catch(err => {
-      console.error(err);
-      container.innerHTML = `<div style="text-align:center;font-size:3rem;margin-top:150px;">Error loading departures.</div>`;
+    const testRow = createRow(service);
+    testRow.style.visibility = 'hidden';
+    container.appendChild(testRow);
+    const fits = testRow.getBoundingClientRect().bottom < pageHeight;
+    container.removeChild(testRow);
+
+    if (!fits) break;
+
+    const newRow = createRow(service);
+    newRow.classList.add('slide-in');
+    container.appendChild(newRow);
+    visibleServices.push(service);
+    setTimeout(() => newRow.classList.remove('slide-in'), 600);
+  }
+}
+
+function removeRowWithStretch(row, index) {
+  const height = row.offsetHeight;
+  row.classList.add('slide-out');
+
+  setTimeout(() => {
+    if (row.parentNode) container.removeChild(row);
+
+    const placeholder = document.createElement('div');
+    placeholder.classList.add('placeholder');
+    placeholder.style.height = `${height}px`;
+
+    container.insertBefore(placeholder, container.children[index]);
+
+    void placeholder.offsetHeight;
+    placeholder.style.height = '0px';
+
+    setTimeout(() => {
+      if (placeholder.parentNode) container.removeChild(placeholder);
+      addNextAvailableService();
+    }, 500);
+  }, 600);
+}
+
+async function fetchDepartures() {
+  try {
+    const res = await fetch(`https://huxley2.azurewebsites.net/departures/${currentStationCode}/25`);
+    const data = await res.json();
+
+    headerTitle.textContent = `${data.locationName || currentStationCode} Departures`;
+
+    let newServices = data.trainServices || [];
+
+    // Sort by STD
+    newServices.sort((a, b) => {
+      const t1 = (a.std || '99:99').split(':').map(Number);
+      const t2 = (b.std || '99:99').split(':').map(Number);
+      return (t1[0]*60 + t1[1]) - (t2[0]*60 + t2[1]);
     });
+
+    // Remove duplicates
+    const seen = new Set();
+    newServices = newServices.filter(s => {
+      const id = getServiceId(s);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+
+    if (previousServices.length === 0) {
+      services = newServices;
+      previousServices = structuredClone(newServices);
+      visibleServices = [];
+      container.innerHTML = '';
+      addNextAvailableService();
+      return;
+    }
+
+    const currentRows = Array.from(container.querySelectorAll('.departure-row'));
+
+    // Update rows where ETD/cancellation/delay changed
+    newServices.forEach((service, i) => {
+      const old = previousServices.find(p => getServiceId(p) === getServiceId(service));
+      if (old) {
+        const changed = service.etd !== old.etd ||
+                        service.cancelReason !== old.cancelReason ||
+                        service.delayReason !== old.delayReason;
+
+        if (changed && currentRows[i]) {
+          currentRows[i].classList.add('slide-out');
+          setTimeout(() => {
+            fillRow(currentRows[i], service);
+            currentRows[i].classList.remove('slide-out');
+            currentRows[i].classList.add('slide-in');
+            setTimeout(() => currentRows[i].classList.remove('slide-in'), 600);
+          }, 600);
+        }
+      }
+    });
+
+    // Remove services that have disappeared from the API
+    const newIds = new Set(newServices.map(getServiceId));
+    currentRows.forEach((row, index) => {
+      const service = visibleServices[index];
+      if (service && !newIds.has(getServiceId(service))) {
+        removeRowWithStretch(row, index);
+        // Update visibleServices to reflect removal
+        visibleServices = visibleServices.filter(s => getServiceId(s) !== getServiceId(service));
+      }
+    });
+
+    services = newServices;
+    previousServices = structuredClone(newServices);
+
+    // Add any new services if there's space
+    setTimeout(addNextAvailableService, 100);
+
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = `<div style="text-align:center;font-size:3rem;margin-top:150px;">Error loading departures.</div>`;
+  }
 }
 
 fetchDepartures();
 setInterval(fetchDepartures, 10000);
-window.addEventListener('resize', renderRows);
 
-headerTitle.addEventListener('click', async () => {
+window.addEventListener('resize', () => {
+  container.innerHTML = '';
+  visibleServices = [];
+  addNextAvailableService();
+});
+
+headerTitle.addEventListener('click', () => {
   const code = prompt('Enter a station code (e.g., EUS, LST, GTW):', currentStationCode);
   if (code) {
     currentStationCode = code.toUpperCase();
-    expiredServices.clear();        // clear expired services
-    previousServices = [];          // reset previous services
-    services = [];                  // reset current services
-    container.innerHTML = '';       // clear displayed rows
-
-    // Fetch departures for the new station
-    await fetchDepartures();
+    services = [];
+    previousServices = [];
+    visibleServices = [];
+    container.innerHTML = '';
+    fetchDepartures();
   }
 });
-
-
 </script>
 </body>
 </html>
