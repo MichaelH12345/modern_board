@@ -106,7 +106,7 @@
 </head>
 <body>
   <header>
-    <div class="header-title" id="header-title">Station Departures</div>
+    <div class="header-title" id="header-title">Departures</div>
     <div class="header-row">
       <div class="time">Time</div>
       <div class="destination">Destination</div>
@@ -355,7 +355,7 @@ function addNewServicesIfPossible() {
 async function fetchDepartures() {
   let success = false;
   try {
-    const res = await fetch(`https://huxley2.azurewebsites.net/departures/${currentStationCode}/25`);
+    const res = await fetch(`https://huxley2.azurewebsites.net/departures/${currentStationCode}/25?accessToken=e48245fd-c8d4-46b5-87ef-60e71665e6b6`);
     const data = await res.json();
 
     headerTitle.textContent = `${data.locationName || currentStationCode} Departures`;
