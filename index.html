@@ -500,11 +500,11 @@ async function fetchDepartures() {
     const offlineSecs = Math.floor((offlineMs % 60000) / 1000);
 
     container.innerHTML = `
-      <div style="text-align:center;font-size:3rem;margin-top:150px;">
+      <div style="text-align:center;font-size:3rem;margin-top:125px;">
         We're working to fix a fault with this board.<br><br>
-        For live train information, speak to station staff, use station help points or check the National Rail app.<br>
+        For live train information speak to station staff, use station help points<br>or check the National Rail app.<br>
         <br><br><br><br><br><br>
-        <div style="font-size:1.5rem;">
+        <div style="font-size:0rem;">
           Time offline: ${offlineMins} mins ${offlineSecs} secs<br>
           Attempted API calls: ${failedAttemptCount}<br>
           Retrying in 10 seconds...
