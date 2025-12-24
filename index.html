@@ -546,6 +546,18 @@ headerTitle.addEventListener('click', () => {
     fetchDepartures();
   }
 });
+const footer = document.querySelector('footer');
+let footerHidden = false;
+
+footer.addEventListener('click', () => {
+  footerHidden = !footerHidden;
+  if (footerHidden) {
+    footer.style.transform = 'translateY(100%)';
+  } else {
+    footer.style.transform = 'translateY(0)';
+  }
+  footer.style.transition = 'transform 0.5s ease-in-out';
+});
 </script>
 </body>
 </html>
