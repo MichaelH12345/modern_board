@@ -211,12 +211,20 @@ function fillRow(row, service) {
     destBox.appendChild(lengthLine);
   }
 
-  // Avanti Pendolino — only for Glasgow Central
+    // Avanti Pendolino
   if (operator === 'Avanti West Coast') {
     const pendolinoLine = document.createElement('div');
     pendolinoLine.textContent = 'Avanti West Coast Pendolino';
     pendolinoLine.classList.add('secondary-info');
     destBox.appendChild(pendolinoLine);
+  }
+
+  // Heathrow Express — priority under Avanti Pendolino
+  if (operator === 'Heathrow Express') {
+    const heathrowLine = document.createElement('div');
+    heathrowLine.textContent = 'Heathrow Express';
+    heathrowLine.classList.add('secondary-info');
+    destBox.appendChild(heathrowLine);
   }
 
   // LNER reservation message
@@ -226,6 +234,7 @@ function fillRow(row, service) {
     lnerLine.classList.add('secondary-info');
     destBox.appendChild(lnerLine);
   }
+
 
   // Delay/Cancel reason — always last, but doesn't block custom messages
   if (service.cancelReason || service.delayReason) {
