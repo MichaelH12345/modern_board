@@ -37,7 +37,7 @@
   }
   .time { width: 100px; }
   .destination { flex: 1; margin-left: 50px; }
-  .platform-header { width: 150px; position: absolute; right: 275px; text-align: right; }
+  .platform-header { width: 150px; position: absolute; right: 285px; text-align: right; }
   .status { width: 150px; position: absolute; right: 15px; text-align: right; }
   .departure-row {
     display: flex;
@@ -100,7 +100,7 @@
   }
 
   .flash {
-    animation: fade 1.25s infinite ease-in-out;
+    animation: fade 1s infinite ease-in-out;
   }
 </style>
 </head>
@@ -110,7 +110,7 @@
     <div class="header-row">
       <div class="time">Time</div>
       <div class="destination">Destination</div>
-      <div class="platform-header">Plat</div>
+      <div class="platform-header">Platform</div>
       <div class="status">Status</div>
     </div>
   </header>
@@ -134,12 +134,14 @@ let currentStationCode = 'CAR';
 let services = [];           
 let previousServices = [];   
 let visibleServices = [];    
+let lastFetchFailed = false;
+let offlineStartTime = null;     
+let failedAttemptCount = 0;      
 
-// Track when a platform was last changed (for 5-minute flash)
-const platformChangeTime = new Map(); // id → timestamp
+const platformChangeTime = new Map();
 
 function getServiceId(service) {
-  return `${service.std}-${service.destination?.[0]?.locationName || ''}`;
+  return `${service.std}-${service.destination?.[0]?.locationName || ''}-${service.isBus ? 'bus' : 'train'}`;
 }
 
 function parseTime(std) {
@@ -190,6 +192,10 @@ function fillRow(row, service) {
   destMain.textContent = service.destination?.[0]?.locationName || '';
   destBox.appendChild(destMain);
 
+  const operator = service.operator || '';
+  const destName = service.destination?.[0]?.locationName || '';
+
+  // Via
   if (service.destination?.[0]?.via) {
     const viaLine = document.createElement('div');
     viaLine.textContent = service.destination[0].via;
@@ -197,6 +203,7 @@ function fillRow(row, service) {
     destBox.appendChild(viaLine);
   }
 
+  // Coach length
   if (service.length && service.length !== 0) {
     const lengthLine = document.createElement('div');
     lengthLine.textContent = `This train has ${service.length} coaches.`;
@@ -204,6 +211,23 @@ function fillRow(row, service) {
     destBox.appendChild(lengthLine);
   }
 
+  // Avanti Pendolino — only for Glasgow Central
+  if (operator === 'Avanti West Coast') {
+    const pendolinoLine = document.createElement('div');
+    pendolinoLine.textContent = 'Avanti West Coast Pendolino';
+    pendolinoLine.classList.add('secondary-info');
+    destBox.appendChild(pendolinoLine);
+  }
+
+  // LNER reservation message
+  if (operator === 'London North Eastern Railway') {
+    const lnerLine = document.createElement('div');
+    lnerLine.textContent = 'Reserve seats up to 5 minutes before departure at LNER.co.uk';
+    lnerLine.classList.add('secondary-info');
+    destBox.appendChild(lnerLine);
+  }
+
+  // Delay/Cancel reason — always last, but doesn't block custom messages
   if (service.cancelReason || service.delayReason) {
     const reasonLine = document.createElement('div');
     if (service.cancelReason) {
@@ -215,6 +239,14 @@ function fillRow(row, service) {
     destBox.appendChild(reasonLine);
   }
 
+  // Rail Replacement Bus — right after destination
+  if (service.isBus) {
+    const busLine = document.createElement('div');
+    busLine.textContent = 'Rail Replacement Bus';
+    busLine.classList.add('secondary-info');
+    destBox.insertBefore(busLine, destBox.children[1]);
+  }
+
   row.appendChild(destBox);
 
   const platform = document.createElement('div');
@@ -224,11 +256,11 @@ function fillRow(row, service) {
   const id = getServiceId(service);
   const changeTime = platformChangeTime.get(id);
   const now = Date.now();
-  const isFlashing = changeTime && (now - changeTime < 300000); // 5 minutes
+  const isFlashing = changeTime && (now - changeTime < 300000);
 
   if (isFlashing && service.platform) {
     platform.classList.add('flash');
-    platform.style.fontFamily = 'Open Sans Sans';
+    platform.style.fontFamily = 'Open Sans';
   } else {
     platform.classList.remove('flash');
     platform.style.fontFamily = 'Open Sans';
@@ -271,7 +303,7 @@ function rebuildVisibleRows() {
 
   const availableHeight = window.innerHeight -
     document.querySelector('header').offsetHeight -
-    document.querySelector('footer').offsetHeight - 20;
+    document.querySelector('footer').offsetHeight - 5;
 
   for (const service of services) {
     const testRow = createRow(service);
@@ -321,22 +353,51 @@ function addNewServicesIfPossible() {
 }
 
 async function fetchDepartures() {
+  let success = false;
   try {
     const res = await fetch(`https://huxley2.azurewebsites.net/departures/${currentStationCode}/25`);
     const data = await res.json();
 
     headerTitle.textContent = `${data.locationName || currentStationCode} Departures`;
 
-    let newServices = data.trainServices || [];
-    newServices.sort((a, b) => parseTime(a.std) - parseTime(b.std));
+    let allServices = [];
+
+    if (data.trainServices) {
+      data.trainServices.forEach(s => {
+        s.isBus = false;
+        allServices.push(s);
+      });
+    }
+
+    if (data.busServices) {
+      data.busServices.forEach(s => {
+        s.isBus = true;
+        allServices.push(s);
+      });
+    }
+
+    allServices.sort((a, b) => parseTime(a.std) - parseTime(b.std));
 
     const seen = new Set();
-    newServices = newServices.filter(s => {
+    const newServices = allServices.filter(s => {
       const id = getServiceId(s);
       if (seen.has(id)) return false;
       seen.add(id);
       return true;
     });
+
+    success = true;
+    failedAttemptCount = 0;
+    offlineStartTime = null;
+
+    if (lastFetchFailed) {
+      services = newServices;
+      previousServices = structuredClone(newServices);
+      platformChangeTime.clear();
+      rebuildVisibleRows();
+      lastFetchFailed = false;
+      return;
+    }
 
     if (previousServices.length === 0) {
       services = newServices;
@@ -347,22 +408,19 @@ async function fetchDepartures() {
 
     const currentRows = Array.from(container.querySelectorAll('.departure-row'));
 
-    // === 1. Handle updates on visible services ===
     visibleServices.forEach((oldVisibleService, i) => {
       const newService = newServices.find(s => getServiceId(s) === getServiceId(oldVisibleService));
-      if (!newService) return; // departed — handled below
+      if (!newService) return;
 
       const oldEtd = oldVisibleService.etd || 'On time';
       const newEtd = newService.etd || 'On time';
 
       const row = currentRows[i];
 
-      // Record platform change
       if (oldVisibleService.platform !== newService.platform && newService.platform) {
         platformChangeTime.set(getServiceId(newService), Date.now());
       }
 
-      // Only animate if ETD actually changed
       if (newEtd !== oldEtd) {
         row.classList.add('slide-out');
         setTimeout(() => {
@@ -375,11 +433,9 @@ async function fetchDepartures() {
         fillRow(row, newService);
       }
 
-      // CRITICAL: Update visibleServices with latest data so next comparison is correct
       visibleServices[i] = newService;
     });
 
-    // === 2. Handle departed services ===
     const newIds = new Set(newServices.map(getServiceId));
     const rowsToRemove = [];
     currentRows.forEach((row, index) => {
@@ -431,7 +487,31 @@ async function fetchDepartures() {
 
   } catch (err) {
     console.error(err);
-    container.innerHTML = `<div style="text-align:center;font-size:3rem;margin-top:150px;">Error loading departures.</div>`;
+
+    failedAttemptCount++;
+
+    if (!offlineStartTime) {
+      offlineStartTime = Date.now();
+    }
+
+    const now = Date.now();
+    const offlineMs = now - offlineStartTime;
+    const offlineMins = Math.floor(offlineMs / 60000);
+    const offlineSecs = Math.floor((offlineMs % 60000) / 1000);
+
+    container.innerHTML = `
+      <div style="text-align:center;font-size:3rem;margin-top:150px;">
+        We're working to fix a fault with this board.<br><br>
+        For live train information, speak to station staff, use station help points or check the National Rail app.<br>
+        <br><br><br><br><br><br>
+        <div style="font-size:1.5rem;">
+          Time offline: ${offlineMins} mins ${offlineSecs} secs<br>
+          Attempted API calls: ${failedAttemptCount}<br>
+          Retrying in 10 seconds...
+        </div>
+      </div>`;
+
+    lastFetchFailed = true;
   }
 }
 
@@ -450,6 +530,9 @@ headerTitle.addEventListener('click', () => {
     previousServices = [];
     visibleServices = [];
     platformChangeTime.clear();
+    offlineStartTime = null;
+    failedAttemptCount = 0;
+    lastFetchFailed = false;
     container.innerHTML = '';
     fetchDepartures();
   }
