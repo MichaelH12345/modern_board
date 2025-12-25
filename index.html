@@ -314,7 +314,7 @@ function rebuildVisibleRows() {
     document.querySelector('header').offsetHeight -
     document.querySelector('footer').offsetHeight - 5;
 
-  for (const service of services) {
+  services.forEach((service, index) => {
     const testRow = createRow(service);
     testRow.style.visibility = 'hidden';
     testRow.style.position = 'absolute';
@@ -322,17 +322,24 @@ function rebuildVisibleRows() {
 
     if (testRow.getBoundingClientRect().bottom - container.getBoundingClientRect().top > availableHeight) {
       container.removeChild(testRow);
-      break;
+      return;
     }
     container.removeChild(testRow);
 
     const newRow = createRow(service);
-    newRow.classList.add('slide-in');
+    newRow.style.visibility = 'hidden';
     container.appendChild(newRow);
     visibleServices.push(service);
-    setTimeout(() => newRow.classList.remove('slide-in'), 700);
-  }
+
+    // Wait 0.5s before first row, then 0.5s after each row
+    setTimeout(() => {
+      newRow.style.visibility = 'visible';
+      newRow.classList.add('slide-in');
+      setTimeout(() => newRow.classList.remove('slide-in'), 700);
+    }, 125 + index * 125); // 0.5s initial wait + 0.5s per row
+  });
 }
+
 
 function addNewServicesIfPossible() {
   const availableHeight = window.innerHeight -
@@ -539,27 +546,47 @@ async function fetchDepartures() {
 fetchDepartures();
 setInterval(fetchDepartures, 10000);
 
-function restartSlideInForVisibleRows() {
+function hideAllRows() {
   const rows = Array.from(container.querySelectorAll('.departure-row'));
   rows.forEach(row => {
-    row.classList.add('slide-in');
-    // Remove the class after the animation completes
-    setTimeout(() => row.classList.remove('slide-in'), 700);
+    row.style.display = 'none';
+  });
+}
+
+function showAllRows() {
+  const rows = Array.from(container.querySelectorAll('.departure-row'));
+  rows.forEach(row => {
+    row.style.display = 'flex'; // restore flex layout
+  });
+}
+
+function staggerSlideInRows() {
+  const rows = Array.from(container.querySelectorAll('.departure-row'));
+  rows.forEach((row, index) => {
+    row.style.visibility = 'hidden'; // hide before starting
+
+    // 0.5s initial delay + 0.5s per row
+    setTimeout(() => {
+      row.style.visibility = 'visible';
+      row.classList.add('slide-in');
+      setTimeout(() => row.classList.remove('slide-in'), 700); // remove class after animation
+    }, 125 + index * 125);
   });
 }
 
 // On window resize
 window.addEventListener('resize', () => {
   rebuildVisibleRows();
-  restartSlideInForVisibleRows();
+  staggerSlideInRows();
 });
 
 // When tab becomes visible again
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
-    restartSlideInForVisibleRows();
+    staggerSlideInRows();
   }
 });
+
 
 
 headerTitle.addEventListener('click', () => {
