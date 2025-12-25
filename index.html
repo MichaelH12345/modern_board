@@ -130,7 +130,7 @@ const footerMessage = document.getElementById('footer-message');
 const footerTimeValue = document.getElementById('footer-time-value');
 const headerTitle = document.getElementById('header-title');
 
-let currentStationCode = 'CAR';
+let currentStationCode = localStorage.getItem('stationCode') || 'CAR';
 let services = [];           
 let previousServices = [];   
 let visibleServices = [];    
@@ -418,32 +418,44 @@ async function fetchDepartures() {
     const currentRows = Array.from(container.querySelectorAll('.departure-row'));
 
     visibleServices.forEach((oldVisibleService, i) => {
-      const newService = newServices.find(s => getServiceId(s) === getServiceId(oldVisibleService));
-      if (!newService) return;
+  const newService = newServices.find(
+    s => getServiceId(s) === getServiceId(oldVisibleService)
+  );
+  if (!newService) return;
 
-      const oldEtd = oldVisibleService.etd || 'On time';
-      const newEtd = newService.etd || 'On time';
+  const row = currentRows[i];
 
-      const row = currentRows[i];
+  const oldEtd = oldVisibleService.etd || 'On time';
+  const newEtd = newService.etd || 'On time';
 
-      if (oldVisibleService.platform !== newService.platform && newService.platform) {
-        platformChangeTime.set(getServiceId(newService), Date.now());
-      }
+  const oldPlatform = oldVisibleService.platform || '';
+  const newPlatform = newService.platform || '';
 
-      if (newEtd !== oldEtd) {
-        row.classList.add('slide-out');
-        setTimeout(() => {
-          fillRow(row, newService);
-          row.classList.remove('slide-out');
-          row.classList.add('slide-in');
-          setTimeout(() => row.classList.remove('slide-in'), 700);
-        }, 700);
-      } else {
-        fillRow(row, newService);
-      }
+  const etdChanged = newEtd !== oldEtd;
+  const platformChanged = oldPlatform !== newPlatform && newPlatform;
 
-      visibleServices[i] = newService;
-    });
+  if (platformChanged) {
+    platformChangeTime.set(getServiceId(newService), Date.now());
+  }
+
+  if (etdChanged || platformChanged) {
+    row.classList.add('slide-out');
+
+    setTimeout(() => {
+      fillRow(row, newService);
+
+      row.classList.remove('slide-out');
+      row.classList.add('slide-in');
+
+      setTimeout(() => row.classList.remove('slide-in'), 700);
+    }, 700);
+  } else {
+    fillRow(row, newService);
+  }
+
+  visibleServices[i] = newService;
+});
+
 
     const newIds = new Set(newServices.map(getServiceId));
     const rowsToRemove = [];
@@ -535,6 +547,7 @@ headerTitle.addEventListener('click', () => {
   const code = prompt('Enter a station code (e.g., EUS, LST, GTW):', currentStationCode);
   if (code) {
     currentStationCode = code.toUpperCase();
+    localStorage.setItem('stationCode', currentStationCode);
     services = [];
     previousServices = [];
     visibleServices = [];
