@@ -336,7 +336,7 @@ function rebuildVisibleRows() {
       newRow.style.visibility = 'visible';
       newRow.classList.add('slide-in');
       setTimeout(() => newRow.classList.remove('slide-in'), 700);
-    }, 125 + index * 125); // 0.5s initial wait + 0.5s per row
+    }, 125 + index * 62.5); // 0.5s initial wait + 0.5s per row
   });
 }
 
@@ -570,7 +570,7 @@ function staggerSlideInRows() {
       row.style.visibility = 'visible';
       row.classList.add('slide-in');
       setTimeout(() => row.classList.remove('slide-in'), 700); // remove class after animation
-    }, 125 + index * 125);
+    }, 125 + index * 62.5);
   });
 }
 
