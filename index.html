@@ -539,9 +539,28 @@ async function fetchDepartures() {
 fetchDepartures();
 setInterval(fetchDepartures, 10000);
 
+function restartSlideInForVisibleRows() {
+  const rows = Array.from(container.querySelectorAll('.departure-row'));
+  rows.forEach(row => {
+    row.classList.add('slide-in');
+    // Remove the class after the animation completes
+    setTimeout(() => row.classList.remove('slide-in'), 700);
+  });
+}
+
+// On window resize
 window.addEventListener('resize', () => {
   rebuildVisibleRows();
+  restartSlideInForVisibleRows();
 });
+
+// When tab becomes visible again
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    restartSlideInForVisibleRows();
+  }
+});
+
 
 headerTitle.addEventListener('click', () => {
   const code = prompt('Enter a station code (e.g., EUS, LST, GTW):', currentStationCode);
