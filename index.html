@@ -272,7 +272,7 @@ if (service.isBus) {
   const id = getServiceId(service);
   const changeTime = platformChangeTime.get(id);
   const now = Date.now();
-  const isFlashing = changeTime && (now - changeTime < 300000);
+  const isFlashing = changeTime && (now - changeTime < 600000);
 
   if (isFlashing && service.platform) {
     platform.classList.add('flash');
