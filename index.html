@@ -110,7 +110,7 @@
     <div class="header-row">
       <div class="time">Time</div>
       <div class="destination">Destination</div>
-      <div class="platform-header">Platform</div>
+      <div class="platform-header">Plat</div>
       <div class="status">Status</div>
     </div>
   </header>
@@ -129,6 +129,7 @@ const container = document.getElementById('departures-container');
 const footerMessage = document.getElementById('footer-message');
 const footerTimeValue = document.getElementById('footer-time-value');
 const headerTitle = document.getElementById('header-title');
+const onTimeStreaks = new Map(); // serviceId -> count of consecutive "On time"
 
 let currentStationCode = localStorage.getItem('stationCode') || 'CAR';
 let services = [];           
@@ -211,13 +212,14 @@ function fillRow(row, service) {
     destBox.appendChild(lengthLine);
   }
 
-    // Avanti Pendolino
-  if (operator === 'Avanti West Coast') {
-    const pendolinoLine = document.createElement('div');
-    pendolinoLine.textContent = 'Avanti West Coast Pendolino';
-    pendolinoLine.classList.add('secondary-info');
-    destBox.appendChild(pendolinoLine);
-  }
+// Avanti Pendolino (not for buses)
+if (operator === 'Avanti West Coast' && !service.isBus) {
+  const pendolinoLine = document.createElement('div');
+  pendolinoLine.textContent = 'Avanti West Coast Pendolino';
+  pendolinoLine.classList.add('secondary-info');
+  destBox.appendChild(pendolinoLine);
+}
+
 
   // Heathrow Express — priority under Avanti Pendolino
   if (operator === 'Heathrow Express') {
@@ -258,9 +260,14 @@ function fillRow(row, service) {
 
   row.appendChild(destBox);
 
-  const platform = document.createElement('div');
-  platform.classList.add('platform');
+const platform = document.createElement('div');
+platform.classList.add('platform');
+
+if (service.isBus) {
+  platform.textContent = 'BUS';
+} else {
   platform.textContent = service.platform || '';
+}
 
   const id = getServiceId(service);
   const changeTime = platformChangeTime.get(id);
@@ -296,6 +303,18 @@ function fillRow(row, service) {
   }
 
   row.appendChild(expected);
+}
+
+function is21SecondsPastSTD(std) {
+  if (!isTime(std)) return false;
+
+  const now = new Date();
+  const [h, m] = std.split(':').map(Number);
+
+  const stdTime = new Date();
+  stdTime.setHours(h, m, 0, 0);
+
+  return now - stdTime >= 21000; // 21 seconds
 }
 
 function createRow(service) {
@@ -421,6 +440,25 @@ async function fetchDepartures() {
       rebuildVisibleRows();
       return;
     }
+
+newServices.forEach(service => {
+  const id = getServiceId(service);
+  const etd = service.etd || 'On time';
+
+  if (etd === 'On time') {
+    const count = (onTimeStreaks.get(id) || 0) + 1;
+    onTimeStreaks.set(id, count);
+
+    if (
+      count >= 120 &&
+      is21SecondsPastSTD(service.std)
+    ) {
+      service.etd = 'Arrived';
+    }
+  } else {
+    onTimeStreaks.delete(id);
+  }
+});
 
     const currentRows = Array.from(container.querySelectorAll('.departure-row'));
 
