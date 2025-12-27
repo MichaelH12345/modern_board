@@ -238,17 +238,25 @@ if (operator === 'Avanti West Coast' && !service.isBus) {
   }
 
 
-  // Delay/Cancel reason — always last, but doesn't block custom messages
-  if (service.cancelReason || service.delayReason) {
-    const reasonLine = document.createElement('div');
-    if (service.cancelReason) {
-      reasonLine.textContent = service.cancelReason.replace('This service has been cancelled because of', 'Service cancelled due to') + '.';
-    } else if (service.delayReason) {
-      reasonLine.textContent = service.delayReason.replace('This service has been delayed by', 'Service delayed due to') + '.';
-    }
-    reasonLine.classList.add('secondary-info');
+// Delay/Cancel reason — always last, but doesn't block custom messages
+if (service.cancelReason || service.delayReason) {
+  const reasonLine = document.createElement('div');
+  if (service.cancelReason) {
+    reasonLine.textContent = service.cancelReason.replace('This service has been cancelled because of', 'Service cancelled due to') + '.';
+    destBox.appendChild(reasonLine);
+
+    // **Add compensation message for cancelled services**
+    const compensationLine = document.createElement('div');
+    compensationLine.textContent = 'Compensation may apply.';
+    compensationLine.classList.add('secondary-info');
+    destBox.appendChild(compensationLine);
+
+  } else if (service.delayReason) {
+    reasonLine.textContent = service.delayReason.replace('This service has been delayed by', 'Service delayed due to') + '.';
     destBox.appendChild(reasonLine);
   }
+}
+
 
   // Rail Replacement Bus — right after destination
   if (service.isBus) {
