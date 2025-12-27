@@ -272,7 +272,7 @@ if (service.isBus) {
   const id = getServiceId(service);
   const changeTime = platformChangeTime.get(id);
   const now = Date.now();
-  const isFlashing = changeTime && (now - changeTime < 600000);
+  const isFlashing = changeTime && (now - changeTime < 300000);
 
   if (isFlashing && service.platform) {
     platform.classList.add('flash');
@@ -420,26 +420,6 @@ async function fetchDepartures() {
       seen.add(id);
       return true;
     });
-    
-    newServices.forEach(service => {
-  const id = getServiceId(service);
-  const etd = service.etd || 'On time';
-
-  if (etd === 'On time') {
-    const count = (onTimeStreaks.get(id) || 0) + 1;
-    onTimeStreaks.set(id, count);
-
-    if (
-      count >= 12 &&
-      is21SecondsPastSTD(service.std)
-    ) {
-      service.etd = 'Arrived';
-    }
-  } else {
-    onTimeStreaks.delete(id);
-  }
-});
-
 
     success = true;
     failedAttemptCount = 0;
@@ -461,6 +441,24 @@ async function fetchDepartures() {
       return;
     }
 
+newServices.forEach(service => {
+  const id = getServiceId(service);
+  const etd = service.etd || 'On time';
+
+  if (etd === 'On time') {
+    const count = (onTimeStreaks.get(id) || 0) + 1;
+    onTimeStreaks.set(id, count);
+
+    if (
+      count >= 120 &&
+      is21SecondsPastSTD(service.std)
+    ) {
+      service.etd = 'Arrived';
+    }
+  } else {
+    onTimeStreaks.delete(id);
+  }
+});
 
     const currentRows = Array.from(container.querySelectorAll('.departure-row'));
 
