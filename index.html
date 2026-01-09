@@ -162,6 +162,31 @@ function updateFooterTime() {
 setInterval(updateFooterTime, 1000);
 updateFooterTime();
 
+// Global flag to force flash animation restart on full minute
+let lastFlashResetMinute = -1;
+
+// Run a cheap check roughly every second
+setInterval(() => {
+  const now = new Date();
+  const currentSecond = now.getSeconds();
+  const currentMinute = now.getMinutes();
+
+  // Only act exactly once per minute, when seconds cross into 00
+  if (currentSecond === 0 && currentMinute !== lastFlashResetMinute) {
+    lastFlashResetMinute = currentMinute;
+
+    // Find all currently flashing elements and FORCE animation restart
+    const flashingElements = document.querySelectorAll('.flash');
+
+    flashingElements.forEach(el => {
+      // Remove class → reflow → re-add class = restarts the animation
+      el.classList.remove('flash');
+      void el.offsetWidth; // trigger reflow (critical!)
+      el.classList.add('flash');
+    });
+  }
+}, 900);  // Not every 1000ms to avoid competing with the time update interval
+
 function updateFooterDate() {
   const now = new Date();
   const weekday = now.toLocaleDateString('en-GB', { weekday: 'long' });
@@ -341,30 +366,82 @@ function rebuildVisibleRows() {
     document.querySelector('header').offsetHeight -
     document.querySelector('footer').offsetHeight - 5;
 
-  services.forEach((service, index) => {
+  for (let i = 0; i < services.length; i++) {
+    const service = services[i];
+
+    // Test if this service fits
     const testRow = createRow(service);
     testRow.style.visibility = 'hidden';
     testRow.style.position = 'absolute';
     container.appendChild(testRow);
 
-    if (testRow.getBoundingClientRect().bottom - container.getBoundingClientRect().top > availableHeight) {
-      container.removeChild(testRow);
-      return;
-    }
+    const fits = 
+      testRow.getBoundingClientRect().bottom - 
+      container.getBoundingClientRect().top <= availableHeight;
+
     container.removeChild(testRow);
 
+    // STOP completely if this next one doesn't fit
+    if (!fits) {
+      break;
+    }
+
+    // It fits → add it with slide-in animation
     const newRow = createRow(service);
-    newRow.style.visibility = 'hidden';
     container.appendChild(newRow);
     visibleServices.push(service);
 
-    // Wait 0.5s before first row, then 0.5s after each row
+    // Staggered appearance (starts after 125ms, then +62.5ms per row)
     setTimeout(() => {
       newRow.style.visibility = 'visible';
       newRow.classList.add('slide-in');
       setTimeout(() => newRow.classList.remove('slide-in'), 700);
-    }, 125 + index * 62.5); // 0.5s initial wait + 0.5s per row
-  });
+    }, 125 + i * 62.5);
+  }
+}
+
+function addNewServicesIfPossible() {
+  if (services.length === 0) return;
+
+  const availableHeight = window.innerHeight -
+    document.querySelector('header').offsetHeight -
+    document.querySelector('footer').offsetHeight - 20;
+
+  // Find the index in the full services[] of our current last visible row
+  let startIndex = 0;
+  if (visibleServices.length > 0) {
+    const lastId = getServiceId(visibleServices[visibleServices.length - 1]);
+    const found = services.findIndex(s => getServiceId(s) === lastId);
+    if (found !== -1) startIndex = found + 1;
+  }
+
+  // Try to append ONLY consecutive services, stop on first that doesn't fit
+  for (let i = startIndex; i < services.length; i++) {
+    const service = services[i];
+
+    const testRow = createRow(service);
+    testRow.style.visibility = 'hidden';
+    testRow.style.position = 'absolute';
+    container.appendChild(testRow);
+
+    const fits = 
+      testRow.getBoundingClientRect().bottom - 
+      container.getBoundingClientRect().top <= availableHeight;
+
+    container.removeChild(testRow);
+
+    if (!fits) {
+      break;  // ← This is the key: stop here — no skipping to later services
+    }
+
+    // Fits → add it
+    const newRow = createRow(service);
+    newRow.classList.add('slide-in');
+    container.appendChild(newRow);
+    visibleServices.push(service);
+
+    setTimeout(() => newRow.classList.remove('slide-in'), 700);
+  }
 }
 
 
@@ -373,27 +450,45 @@ function addNewServicesIfPossible() {
     document.querySelector('header').offsetHeight -
     document.querySelector('footer').offsetHeight - 20;
 
-  for (const service of services) {
-    const id = getServiceId(service);
-    if (visibleServices.some(s => getServiceId(s) === id)) continue;
+  // Find where we left off: index of the last currently visible service in the full sorted services[]
+  let startIndex = 0;
+  if (visibleServices.length > 0) {
+    const lastVisibleId = getServiceId(visibleServices[visibleServices.length - 1]);
+    startIndex = services.findIndex(s => getServiceId(s) === lastVisibleId) + 1;
+  }
 
+  // Now try to add ONLY the very next one(s), but STOP on FIRST failure
+  for (let i = startIndex; i < services.length; i++) {
+    const service = services[i];
+
+    // Test if this specific next service would fit
     const testRow = createRow(service);
     testRow.style.visibility = 'hidden';
     testRow.style.position = 'absolute';
     container.appendChild(testRow);
 
-    const wouldFit = testRow.getBoundingClientRect().bottom - container.getBoundingClientRect().top <= availableHeight;
+    const fits = 
+      testRow.getBoundingClientRect().bottom - 
+      container.getBoundingClientRect().top <= availableHeight;
+
     container.removeChild(testRow);
 
-    if (!wouldFit) break;
+    if (!fits) {
+      // First one that doesn't fit → STOP COMPLETELY, do not try any further services
+      break;
+    }
 
+    // It fits → add it for real
     const newRow = createRow(service);
     newRow.classList.add('slide-in');
     container.appendChild(newRow);
     visibleServices.push(service);
+
+    // Optional: small stagger for nicer effect
     setTimeout(() => newRow.classList.remove('slide-in'), 700);
   }
 }
+
 
 async function fetchDepartures() {
   let success = false;
